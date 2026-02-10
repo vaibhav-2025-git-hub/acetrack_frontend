@@ -4,15 +4,15 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { 
-  UserCircle, 
-  Users, 
-  Mail, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  GraduationCap, 
-  BookOpen, 
+import {
+  UserCircle,
+  Users,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  GraduationCap,
+  BookOpen,
   Phone,
   MapPin,
   School,
@@ -37,7 +37,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
     email: '',
     password: '',
     confirmPassword: '',
-    
+
     // Student fields
     fullName: '',
     class: '12th', // Hardcoded for 12th
@@ -45,14 +45,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
     stream: '',
     phoneNumber: '',
     schoolName: '',
-    
+
     // Parent fields
     parentName: '',
     studentName: '',
     studentClass: '',
     relationship: '',
     parentPhone: '',
-    
+
     // Faculty fields
     facultyName: '',
     instituteName: '',
@@ -119,7 +119,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       toast.error('Please fix the errors in the form');
       return;
@@ -132,19 +132,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         // localStorage-only login
         const storedUsers = JSON.parse(localStorage.getItem('acetrack_users') || '[]');
         const user = storedUsers.find((u: any) => u.email === formData.email);
-        
+
         if (!user) {
           toast.error('No account found with this email');
           setIsLoading(false);
           return;
         }
-        
+
         if (user.password !== formData.password) {
           toast.error('Incorrect password');
           setIsLoading(false);
           return;
         }
-        
+
         toast.success(`Welcome back! Logging in as ${userType}...`);
         setTimeout(() => {
           onLogin(userType, {
@@ -158,13 +158,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         // localStorage-only signup
         const storedUsers = JSON.parse(localStorage.getItem('acetrack_users') || '[]');
         const existingUser = storedUsers.find((u: any) => u.email === formData.email);
-        
+
         if (existingUser) {
           toast.error('Account already exists with this email');
           setIsLoading(false);
           return;
         }
-        
+
         // Create new user
         const newUser = {
           email: formData.email,
@@ -176,10 +176,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
           stream: formData.stream,
           createdAt: new Date().toISOString(),
         };
-        
+
         storedUsers.push(newUser);
         localStorage.setItem('acetrack_users', JSON.stringify(storedUsers));
-        
+
         toast.success(`Account created successfully! Welcome aboard! 🎉`);
         setTimeout(() => {
           onLogin(userType, {
@@ -250,8 +250,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
               </Button>
             </div>
             <CardDescription className="text-sm text-gray-600">
-              {authMode === 'login' 
-                ? 'Continue your learning journey' 
+              {authMode === 'login'
+                ? 'Continue your learning journey'
                 : 'Join AceTrack today'}
             </CardDescription>
           </CardHeader>
@@ -681,8 +681,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
                 </>
               )}
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium shadow-sm"
                 size="lg"
                 disabled={isLoading}

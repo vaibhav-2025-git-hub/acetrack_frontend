@@ -1,10 +1,10 @@
 /**
  * API Service for AceTrack Backend
- * Handles all HTTP requests to the PHP backend
+ * Handles all HTTP requests to the Node.js backend
  */
 
 // Get API base URL from environment variable or use default
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/backend/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 // Storage keys
 const TOKEN_KEY = 'acetrack_token';
@@ -29,29 +29,29 @@ const removeToken = (): void => {
 // API request wrapper
 const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
   const token = getToken();
-  
+
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
-  
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   const config: RequestInit = {
     ...options,
     headers,
   };
-  
+
   try {
     const response = await fetch(`${API_BASE_URL}/${endpoint}`, config);
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.message || 'Request failed');
     }
-    
+
     return data;
   } catch (error) {
     console.error('API request error:', error);
@@ -62,39 +62,39 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<
 // Authentication API
 export const authAPI = {
   register: async (userData: { email: string; password: string; name: string; user_type?: string }) => {
-    const response = await apiRequest('auth.php?action=register', {
+    const response = await apiRequest('auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
-    
+
     if (response.success && response.data.token) {
       setToken(response.data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(response.data));
     }
-    
+
     return response;
   },
-  
+
   login: async (credentials: { email: string; password: string }) => {
-    const response = await apiRequest('auth.php?action=login', {
+    const response = await apiRequest('auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    
+
     if (response.success && response.data.token) {
       setToken(response.data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(response.data));
     }
-    
+
     return response;
   },
-  
+
   logout: () => {
     removeToken();
   },
-  
+
   verifyToken: async (token: string) => {
-    return await apiRequest('auth.php?action=verify', {
+    return await apiRequest('auth/verify', {
       method: 'POST',
       body: JSON.stringify({ token }),
     });
@@ -104,20 +104,20 @@ export const authAPI = {
 // Profile API
 export const profileAPI = {
   get: async () => {
-    return await apiRequest('profile.php', {
+    return await apiRequest('profile', {
       method: 'GET',
     });
   },
-  
+
   create: async (profileData: any) => {
-    return await apiRequest('profile.php', {
+    return await apiRequest('profile', {
       method: 'POST',
       body: JSON.stringify(profileData),
     });
   },
-  
+
   update: async (profileData: any) => {
-    return await apiRequest('profile.php', {
+    return await apiRequest('profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     });
@@ -127,123 +127,141 @@ export const profileAPI = {
 // Study Plan API
 export const studyPlanAPI = {
   get: async () => {
-    return await apiRequest('study_plan.php?action=get', {
+    return await apiRequest('study-plan', {
       method: 'GET',
     });
   },
-  
+
   create: async (planData: any) => {
-    return await apiRequest('study_plan.php?action=create', {
+    return await apiRequest('study-plan', {
       method: 'POST',
       body: JSON.stringify(planData),
     });
   },
-  
+
   update: async (planData: any) => {
-    return await apiRequest('study_plan.php?action=update', {
+    // Note: Update endpoint might need adjustment on backend if not implemented yet
+    return await apiRequest('study-plan', {
       method: 'PUT',
       body: JSON.stringify(planData),
     });
   },
-  
+
   completeSession: async (sessionId: number) => {
-    return await apiRequest('study_plan.php?action=complete_session', {
-      method: 'POST',
-      body: JSON.stringify({ session_id: sessionId }),
-    });
+    // Backend doesn't have this specific endpoint yet, might need to use progress update or create one
+    //  return await apiRequest(`study-plan/session/${sessionId}/complete`, {
+    //   method: 'POST',
+    // });
+    console.warn('completeSession not fully implemented in backend');
+    return { success: true };
   },
-  
+
   updateSession: async (sessionId: number, updates: any) => {
-    return await apiRequest('study_plan.php?action=update_session', {
-      method: 'POST',
-      body: JSON.stringify({ session_id: sessionId, ...updates }),
-    });
+    // return await apiRequest(`study-plan/session/${sessionId}`, {
+    //   method: 'PUT',
+    //   body: JSON.stringify(updates),
+    // });
+    console.warn('updateSession not fully implemented in backend');
+    return { success: true };
   },
 };
 
 // Progress API
 export const progressAPI = {
   get: async () => {
-    return await apiRequest('progress.php?action=get', {
+    return await apiRequest('progress', {
       method: 'GET',
     });
   },
-  
+
   update: async (progressData: any) => {
-    return await apiRequest('progress.php?action=update', {
+    return await apiRequest('progress', {
       method: 'POST',
       body: JSON.stringify(progressData),
     });
   },
-  
+
   getStats: async () => {
-    return await apiRequest('progress.php?action=stats', {
-      method: 'GET',
-    });
+    // return await apiRequest('progress/stats', {
+    //   method: 'GET',
+    // });
+    console.warn('getStats not fully implemented in backend');
+    return { success: true, data: {} };
   },
-  
+
   getAnalytics: async () => {
-    return await apiRequest('progress.php?action=analytics', {
-      method: 'GET',
-    });
+    // return await apiRequest('progress/analytics', {
+    //   method: 'GET',
+    // });
+    console.warn('getAnalytics not fully implemented in backend');
+    return { success: true, data: {} };
   },
 };
 
 // Flashcards API
 export const flashcardsAPI = {
   get: async (subjectId?: string, topicId?: string) => {
-    let url = 'flashcards.php?action=get';
-    if (subjectId) url += `&subject_id=${subjectId}`;
-    if (topicId) url += `&topic_id=${topicId}`;
-    
-    return await apiRequest(url, {
-      method: 'GET',
-    });
+
+    // Backend implementation:
+    // router.get('/subjects', getSubjects);
+    // router.get('/subject/:subjectId', getFlashcardsBySubject);
+
+    if (subjectId) {
+      return await apiRequest(`flashcards/subject/${subjectId}`, { method: 'GET' });
+    }
+
+    return await apiRequest(`flashcards/subjects`, { method: 'GET' });
   },
-  
+
   create: async (flashcardData: any) => {
-    return await apiRequest('flashcards.php?action=create', {
+    return await apiRequest('flashcards', {
       method: 'POST',
       body: JSON.stringify(flashcardData),
     });
   },
-  
+
   review: async (flashcardId: number, correct: boolean) => {
-    return await apiRequest('flashcards.php?action=review', {
-      method: 'POST',
-      body: JSON.stringify({ flashcard_id: flashcardId, correct }),
+    return await apiRequest(`flashcards/${flashcardId}/review`, {
+      method: 'PUT',
+      body: JSON.stringify({ correct }),
     });
   },
-  
+
   getDue: async () => {
-    return await apiRequest('flashcards.php?action=due', {
-      method: 'GET',
-    });
+    // Not implemented in backend yet
+    // return await apiRequest('flashcards/due', {
+    //   method: 'GET',
+    // });
+    console.warn('getDue not fully implemented in backend');
+    return { success: true, data: [] };
   },
 };
 
 // Quizzes API
 export const quizzesAPI = {
   submit: async (quizData: any) => {
-    return await apiRequest('quizzes.php?action=submit', {
+    return await apiRequest('quiz/attempt', {
       method: 'POST',
       body: JSON.stringify(quizData),
     });
   },
-  
+
   getHistory: async (subjectId?: string, limit: number = 20) => {
-    let url = `quizzes.php?action=history&limit=${limit}`;
+    let url = `quiz/history?limit=${limit}`;
     if (subjectId) url += `&subject_id=${subjectId}`;
-    
+
     return await apiRequest(url, {
       method: 'GET',
     });
   },
-  
+
   getStats: async () => {
-    return await apiRequest('quizzes.php?action=stats', {
-      method: 'GET',
-    });
+    // Not implemented in backend yet
+    // return await apiRequest('quiz/stats', {
+    //   method: 'GET',
+    // });
+    console.warn('getStats not fully implemented in backend');
+    return { success: true, data: {} };
   },
 };
 

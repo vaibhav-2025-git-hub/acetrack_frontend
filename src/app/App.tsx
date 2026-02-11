@@ -11,6 +11,7 @@ import { StudyDashboard } from "./components/StudyDashboard";
 import { FacultyDashboard } from "./components/FacultyDashboard";
 import { curriculumData } from "./data/curriculum";
 import { generateImprovedStudyPlan } from "./utils/improvedPlanGenerator";
+import { toISODate } from "./utils/helpers";
 import {
   UserProfile,
   LearningSpeed,
@@ -26,8 +27,103 @@ type Step =
   | "difficulty"
   | "dashboard";
 
+console.log("App.tsx script executing");
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, color: 'red', background: 'white', minHeight: '100vh', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999 }}>
+          <h2>Component Crash Caught by ErrorBoundary</h2>
+          <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error?.message}</pre>
+          <pre style={{ fontSize: '12px', opacity: 0.7 }}>{this.state.error?.stack}</pre>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+const mapBackendPlanToFrontend = (backendPlan: any) => {
+  if (!backendPlan) return null;
+
+  const mappedDailyPlans: Record<string, any> = {};
+  const days: any[] = [];
+
+  if (backendPlan.daily_plans) {
+    backendPlan.daily_plans.forEach((dp: any) => {
+      const dateKey = toISODate(dp.date);
+      const mappedSessions = (dp.sessions || []).map((s: any) => ({
+        id: s.id?.toString() || Math.random().toString(),
+        topicId: s.topic_id || 'unassigned',
+        topicName: s.topic_name || 'Study Session',
+        chapterId: s.chapter_id || 'unassigned',
+        chapterName: s.chapter_name || 'General',
+        subjectId: s.subject_id || 'unassigned',
+        subjectName: s.subject_name || 'Subject',
+        date: dateKey,
+        startTime: s.start_time || '09:00',
+        duration: s.duration || 60,
+        status: s.status || (s.completed ? 'completed' : 'not-started'),
+        completed: s.completed || s.status === 'completed',
+        isRevision: s.is_revision || false,
+        completionPercentage: s.completion_percentage || 0,
+        notes: s.notes,
+        completedAt: s.completed_at
+      }));
+
+      mappedDailyPlans[dateKey] = {
+        date: dateKey,
+        sessions: mappedSessions,
+        totalHours: (dp.sessions || []).reduce((acc: number, s: any) => acc + (s.duration || 60), 0) / 60,
+        completedHours: (dp.sessions || []).filter((s: any) => s.status === 'completed' || s.completed).reduce((acc: number, s: any) => acc + (s.duration || 60), 0) / 60,
+        burnoutLevel: dp.burnout_level || 0
+      };
+
+      days.push({
+        date: dateKey,
+        sessions: mappedSessions.map((s: any) => ({
+          id: s.id,
+          topicId: s.topicId,
+          topicName: s.topicName,
+          chapterId: s.chapterId,
+          chapterName: s.chapterName,
+          subjectId: s.subjectId,
+          duration: s.duration,
+          completed: s.completed
+        }))
+      });
+    });
+  }
+
+  return {
+    dailyPlans: mappedDailyPlans,
+    days: days,
+    overallProgress: backendPlan.overall_progress || 0,
+    currentStreak: backendPlan.current_streak || 0,
+    longestStreak: backendPlan.longest_streak || 0,
+    subjectTracking: {},
+    parentAlerts: []
+  };
+};
+
 const AppContent: React.FC = () => {
-  const { userProfile, setUserProfile, setStudyPlan } =
+  console.log("AppContent rendering");
+  const { userProfile, setUserProfile, setStudyPlan, setProgressData } =
     useStudyPlan();
   const [currentStep, setCurrentStep] = useState<Step>("auth");
   const [tempProfile, setTempProfile] = useState<
@@ -40,30 +136,90 @@ const AppContent: React.FC = () => {
 
   // Check for saved authentication and profile on mount
   useEffect(() => {
-    const savedAuth = localStorage.getItem("isAuthenticated");
-    const savedUserType = localStorage.getItem("userType");
-    const savedProfile = localStorage.getItem("userProfile");
-    const savedPlan = localStorage.getItem("studyPlan");
+    const restoreSession = async () => {
+      const savedAuth = localStorage.getItem("isAuthenticated");
+      const savedUserType = localStorage.getItem("userType");
+      const savedProfile = localStorage.getItem("userProfile");
+      const savedPlan = localStorage.getItem("studyPlan");
 
-    if (
-      savedAuth === "true" &&
-      savedUserType &&
-      savedProfile &&
-      savedPlan
-    ) {
-      // User has a complete profile - restore and go to dashboard
-      setIsAuthenticated(true);
-      setUserType(
-        savedUserType as "student" | "parent" | "faculty",
-      );
-      setUserProfile(JSON.parse(savedProfile));
-      setStudyPlan(JSON.parse(savedPlan));
-      setCurrentStep("dashboard");
-      toast.success("Welcome back! 👋");
-    }
+      if (savedAuth === "true" && savedUserType) {
+        setIsAuthenticated(true);
+        const type = savedUserType as "student" | "parent" | "faculty";
+        setUserType(type);
+
+        if (savedProfile && savedPlan) {
+          try {
+            setUserProfile(JSON.parse(savedProfile));
+            setStudyPlan(JSON.parse(savedPlan));
+            setCurrentStep("dashboard");
+            return;
+          } catch (e) {
+            console.error("Failed to parse saved profile/plan", e);
+          }
+        }
+
+        // If data is missing but we're authenticated, we need to fetch from backend
+        try {
+          const { profileAPI, studyPlanAPI, progressAPI } = await import("./services/api");
+
+          console.log("Restoring session from backend...");
+          const profileResponse = await profileAPI.get();
+
+          if (profileResponse.success && profileResponse.data) {
+            setUserProfile(profileResponse.data);
+            localStorage.setItem("userProfile", JSON.stringify(profileResponse.data));
+
+            const [planRes, progRes] = await Promise.all([
+              studyPlanAPI.get().catch(e => ({ success: false, error: e })),
+              progressAPI.get().catch(e => ({ success: false, error: e }))
+            ]);
+
+            if (planRes.success && planRes.data) {
+              const mappedPlan = mapBackendPlanToFrontend(planRes.data);
+              setStudyPlan(mappedPlan as any);
+              localStorage.setItem("studyPlan", JSON.stringify(mappedPlan));
+            } else {
+              console.warn("No study plan found on server during restore");
+            }
+
+            if (progRes.success && progRes.data) {
+              const mappedProgress: Record<string, any> = {};
+              progRes.data.forEach((p: any) => {
+                mappedProgress[p.topic_id] = {
+                  topicId: p.topic_id,
+                  masteryLevel: parseFloat(p.mastery_level || 0),
+                  timeSpent: p.time_spent || 0,
+                  lastStudied: p.last_studied,
+                  notes: p.notes
+                };
+              });
+              setProgressData(mappedProgress);
+              localStorage.setItem("progressData", JSON.stringify(mappedProgress));
+            }
+
+            setCurrentStep("dashboard");
+          } else {
+            console.error("Profile fetch failed during restore", profileResponse);
+            if (savedProfile) {
+              setUserProfile(JSON.parse(savedProfile));
+              if (savedPlan) setStudyPlan(JSON.parse(savedPlan));
+              setCurrentStep("dashboard");
+            } else {
+              // If no profile at all, send to auth
+              setIsAuthenticated(false);
+              setCurrentStep("auth");
+            }
+          }
+        } catch (e) {
+          console.error("Critical error during session restoration", e);
+        }
+      }
+    };
+
+    restoreSession();
   }, []);
 
-  const handleLogin = (
+  const handleLogin = async (
     type: "student" | "parent" | "faculty",
     userData: any,
   ) => {
@@ -86,27 +242,84 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    // For students: Check if this is a login (returning user) or registration (new user)
-    if (userData.isReturningUser) {
-      // Returning user - check if they have a saved profile
-      const savedProfile = localStorage.getItem("userProfile");
-      const savedPlan = localStorage.getItem("studyPlan");
+    // For students
+    // Check if backend says they have a profile (from login response)
+    // Or check localStorage as fallback
+    console.log("handleLogin triggered", { type, userData });
+    const hasProfile = userData.has_profile ?? (userData.isReturningUser && localStorage.getItem("userProfile"));
+    console.log("hasProfile status:", hasProfile);
 
-      if (savedProfile && savedPlan) {
-        // User has completed profile setup before - go directly to dashboard
-        toast.success(`Welcome back, ${userData.name}! 🎉`);
-        setUserProfile(JSON.parse(savedProfile));
-        setStudyPlan(JSON.parse(savedPlan));
-        setCurrentStep("dashboard");
-      } else {
-        // User logged in but hasn't completed profile setup
-        toast.info(
-          "Please complete your profile setup to continue",
-        );
-        setCurrentStep("profile");
+    if (hasProfile) {
+      try {
+        console.log("Fetching profile, plan and progress from backend...");
+        const { profileAPI, studyPlanAPI, progressAPI } = await import("./services/api");
+
+        const profileResponse = await profileAPI.get();
+        console.log("Profile response:", profileResponse);
+
+        if (profileResponse.success && profileResponse.data) {
+          const profile = profileResponse.data;
+          setUserProfile(profile);
+          localStorage.setItem("userProfile", JSON.stringify(profile));
+
+          const [planRes, progRes] = await Promise.all([
+            studyPlanAPI.get().catch(pe => {
+              console.error("Plan fecth error", pe);
+              return { success: false };
+            }),
+            progressAPI.get().catch(pre => {
+              console.error("Progress fetch error", pre);
+              return { success: false };
+            })
+          ]);
+
+          if (planRes.success && planRes.data) {
+            const mappedPlan = mapBackendPlanToFrontend(planRes.data);
+            setStudyPlan(mappedPlan as any);
+            localStorage.setItem("studyPlan", JSON.stringify(mappedPlan));
+            console.log("Study plan mapped and set");
+          } else {
+            console.warn("User has profile but no study plan found on backend");
+            // If no plan, we should probably generate one based on the profile
+            toast.info("Generating your study plan...");
+            const generatedPlan = generateImprovedStudyPlan(profile);
+            setStudyPlan(generatedPlan);
+            localStorage.setItem("studyPlan", JSON.stringify(generatedPlan));
+          }
+
+          if (progRes.success && progRes.data) {
+            const mappedProgress: Record<string, any> = {};
+            progRes.data.forEach((p: any) => {
+              mappedProgress[p.topic_id] = {
+                topicId: p.topic_id,
+                masteryLevel: parseFloat(p.mastery_level || 0),
+                timeSpent: p.time_spent || 0,
+                lastStudied: p.last_studied,
+                notes: p.notes
+              };
+            });
+            setProgressData(mappedProgress);
+            localStorage.setItem("progressData", JSON.stringify(mappedProgress));
+            console.log("Progress data mapped and set");
+          }
+
+          setCurrentStep("dashboard");
+          toast.success(`Welcome back, ${userData.name || profile.name}! 🎉`);
+          return;
+        } else {
+          console.log("Profile response indicates failure, but hasProfile was true.");
+          toast.error("Could not load your profile. Sending to setup.");
+          setCurrentStep("profile");
+        }
+      } catch (error) {
+        console.error("Failed to fetch profile on login", error);
+        toast.error("Error connecting to server. Please try again.");
       }
-    } else {
-      // New registration - go through full profile setup
+    }
+
+    // If no profile or new user
+    if (!hasProfile) {
+      // New registration or returning user without profile - go through full profile setup
       // If user data includes profile info (from registration), pre-fill it
       if (userData.class && userData.board && userData.stream) {
         setTempProfile({
@@ -117,6 +330,7 @@ const AppContent: React.FC = () => {
         });
       }
 
+      toast.info("Please complete your profile setup to continue");
       setCurrentStep("profile");
     }
   };
@@ -143,7 +357,7 @@ const AppContent: React.FC = () => {
     setCurrentStep("difficulty");
   };
 
-  const handleDifficultyComplete = (
+  const handleDifficultyComplete = async (
     subjectDifficulties: Record<string, Difficulty>,
   ) => {
     const completeProfile: UserProfile = {
@@ -154,12 +368,50 @@ const AppContent: React.FC = () => {
 
     setUserProfile(completeProfile);
 
-    // Generate study plan
+    // Save to backend
+    try {
+      const { profileAPI, studyPlanAPI } = await import("./services/api");
+
+      // Map to backend format (snake_case)
+      const profilePayload = {
+        name: completeProfile.name,
+        class: completeProfile.class,
+        board: completeProfile.board,
+        stream: completeProfile.stream,
+        learning_speed: completeProfile.learningSpeed,
+        learning_style: completeProfile.learningStyle,
+        study_duration: completeProfile.totalDays,
+        selected_subjects: completeProfile.selectedSubjects,
+        subject_difficulties: completeProfile.subjectDifficulties
+      };
+
+      await profileAPI.create(profilePayload);
+
+      // Create backend study plan
+      const planPayload = {
+        start_date: toISODate(completeProfile.startDate),
+        end_date: toISODate(new Date(new Date(completeProfile.startDate).getTime() + completeProfile.totalDays * 24 * 60 * 60 * 1000)),
+        total_days: completeProfile.totalDays,
+        subjects: completeProfile.selectedSubjects // Assuming backend accepts array of strings/IDs
+      };
+
+      await studyPlanAPI.create(planPayload);
+
+    } catch (error) {
+      console.error("Failed to save profile/plan to backend", error);
+      toast.error("Warning: Could not save progress to server.");
+    }
+
+    // Generate study plan (Frontend version for immediate display)
     toast.loading("Generating your personalized study plan...");
     setTimeout(() => {
       try {
         const plan = generateImprovedStudyPlan(completeProfile);
         setStudyPlan(plan);
+        // Save to local storage as backup/current session cache
+        localStorage.setItem("userProfile", JSON.stringify(completeProfile));
+        localStorage.setItem("studyPlan", JSON.stringify(plan));
+
         toast.dismiss();
         toast.success("Your study plan is ready!");
         setCurrentStep("dashboard");
@@ -243,7 +495,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <StudyPlanProvider>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </StudyPlanProvider>
   );
 };

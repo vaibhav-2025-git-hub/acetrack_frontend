@@ -43,18 +43,33 @@ export const StudyPlanProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('userProfile');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('userProfile');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error("Error parsing userProfile from localStorage", e);
+      return null;
+    }
   });
 
   const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(() => {
-    const saved = localStorage.getItem('studyPlan');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('studyPlan');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error("Error parsing studyPlan from localStorage", e);
+      return null;
+    }
   });
 
   const [progressData, setProgressData] = useState<Record<string, ProgressData>>(() => {
-    const saved = localStorage.getItem('progressData');
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem('progressData');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Error parsing progressData from localStorage", e);
+      return {};
+    }
   });
 
   const [scheduleChanges, setScheduleChanges] = useState<ScheduleChange[]>(() => {

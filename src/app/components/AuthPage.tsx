@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authAPI } from '../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -129,66 +130,34 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
     try {
       if (authMode === 'login') {
-        // localStorage-only login
-        const storedUsers = JSON.parse(localStorage.getItem('acetrack_users') || '[]');
-        const user = storedUsers.find((u: any) => u.email === formData.email);
+        const response = await authAPI.login({
+          email: formData.email,
+          password: formData.password,
+        });
 
-        if (!user) {
-          toast.error('No account found with this email');
-          setIsLoading(false);
-          return;
-        }
-
-        if (user.password !== formData.password) {
-          toast.error('Incorrect password');
-          setIsLoading(false);
-          return;
-        }
-
-        toast.success(`Welcome back! Logging in as ${userType}...`);
+        toast.success(`Welcome back! Logging in as ${response.data.user_type}...`);
         setTimeout(() => {
-          onLogin(userType, {
-            email: user.email,
-            type: userType,
-            name: user.name,
+          onLogin(response.data.user_type, {
+            ...response.data,
             isReturningUser: true,
           });
         }, 500);
       } else {
-        // localStorage-only signup
-        const storedUsers = JSON.parse(localStorage.getItem('acetrack_users') || '[]');
-        const existingUser = storedUsers.find((u: any) => u.email === formData.email);
-
-        if (existingUser) {
-          toast.error('Account already exists with this email');
-          setIsLoading(false);
-          return;
-        }
-
-        // Create new user
-        const newUser = {
-          email: formData.email,
+        // Register
+        const email = formData.email.trim().toLowerCase();
+        const registerData = {
+          email: email,
           password: formData.password,
+          user_type: userType,
           name: userType === 'student' ? formData.fullName : userType === 'parent' ? formData.parentName : formData.facultyName,
-          type: userType,
-          class: userType === 'student' ? formData.class : formData.studentClass,
-          board: formData.board,
-          stream: formData.stream,
-          createdAt: new Date().toISOString(),
         };
 
-        storedUsers.push(newUser);
-        localStorage.setItem('acetrack_users', JSON.stringify(storedUsers));
+        const response = await authAPI.register(registerData);
 
         toast.success(`Account created successfully! Welcome aboard! 🎉`);
         setTimeout(() => {
           onLogin(userType, {
-            email: newUser.email,
-            type: userType,
-            name: newUser.name,
-            class: newUser.class,
-            board: newUser.board,
-            stream: newUser.stream,
+            ...response.data,
             isReturningUser: false,
           });
         }, 500);

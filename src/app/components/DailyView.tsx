@@ -10,16 +10,16 @@ import { Badge } from './ui/badge';
 import { SessionCustomizationModal } from './SessionCustomizationModal';
 import { adaptPlanAfterSession, reorderSession, changeSessionSubject } from '../utils/improvedPlanGenerator';
 import { getReferenceLinks } from '../data/referenceLinks';
-import { 
-  canSkipSubject, 
-  updateSubjectTracking, 
+import {
+  canSkipSubject,
+  updateSubjectTracking,
   checkSubjectNeglect,
   clearSubjectAlerts
 } from '../utils/subjectTracker';
-import { 
-  checkAndTriggerRescheduling, 
+import {
+  checkAndTriggerRescheduling,
   generateRescheduleSuggestions,
-  analyzeSkipPatterns 
+  analyzeSkipPatterns
 } from '../utils/intelligentRescheduler';
 import { curriculumData } from '../data/curriculum';
 import { toast } from 'sonner';
@@ -82,7 +82,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [currentDate, showKeyboardShortcuts]);
 
-  if (!studyPlan || !userProfile) return null;
+  if (!studyPlan || !userProfile || !studyPlan.dailyPlans) return null;
 
   const dailyPlan = studyPlan.dailyPlans[currentDate];
 
@@ -101,7 +101,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
     // Check if subject can be skipped
     if (status === 'skipped') {
       const skipCheck = canSkipSubject(studyPlan, session.subjectId, currentDate);
-      
+
       // Show warning if subject hasn't been studied for 2+ days
       if (skipCheck.shouldAlert) {
         toast.warning(
@@ -120,12 +120,12 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
     const updatedSessions = dailyPlan.sessions.map((s) =>
       s.id === sessionId
         ? {
-            ...s,
-            status,
-            completed: status === 'completed',
-            completionPercentage: status === 'completed' ? 100 : status === 'in-progress' ? 50 : 0,
-            completedAt: status === 'completed' ? new Date().toISOString() : undefined,
-          }
+          ...s,
+          status,
+          completed: status === 'completed',
+          completionPercentage: status === 'completed' ? 100 : status === 'in-progress' ? 50 : 0,
+          completedAt: status === 'completed' ? new Date().toISOString() : undefined,
+        }
         : s
     );
 
@@ -145,21 +145,21 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
         },
       },
       // Also update the days array for analytics - create a new array
-      days: (studyPlan.days || []).map(day => 
+      days: (studyPlan.days || []).map(day =>
         day.date === currentDate
           ? {
-              date: day.date,
-              sessions: updatedSessions.map(s => ({
-                id: s.id,
-                topicId: s.topicId,
-                topicName: s.topicName,
-                chapterId: s.chapterId,
-                chapterName: s.chapterName,
-                subjectId: s.subjectId,
-                duration: s.duration,
-                completed: s.completed || s.status === 'completed'
-              }))
-            }
+            date: day.date,
+            sessions: updatedSessions.map(s => ({
+              id: s.id,
+              topicId: s.topicId,
+              topicName: s.topicName,
+              chapterId: s.chapterId,
+              chapterName: s.chapterName,
+              subjectId: s.subjectId,
+              duration: s.duration,
+              completed: s.completed || s.status === 'completed'
+            }))
+          }
           : { ...day, sessions: [...day.sessions] } // Create new references for unchanged days too
       )
     };
@@ -209,11 +209,11 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
   const handleReorderSession = (fromIndex: number, toIndex: number) => {
     const updatedPlan = reorderSession(studyPlan, currentDate, fromIndex, toIndex);
     setStudyPlan(updatedPlan);
-    
+
     // Track the schedule change
     const fromSession = dailyPlan.sessions[fromIndex];
     const toSession = dailyPlan.sessions[toIndex];
-    
+
     addScheduleChange({
       type: 'reschedule',
       title: 'Session Order Changed',
@@ -225,20 +225,20 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
         reason: 'Manual rescheduling requested'
       }
     });
-    
+
     toast.success('Session order updated!');
   };
 
   const handleChangeSubject = (sessionId: string, newSubjectId: string) => {
     const session = dailyPlan.sessions.find(s => s.id === sessionId);
     const oldSubjectName = session?.subjectName || 'Unknown';
-    
+
     const updatedPlan = changeSessionSubject(studyPlan, userProfile, currentDate, sessionId, newSubjectId);
     setStudyPlan(updatedPlan);
-    
+
     // Find new subject name
     const newSubject = availableSubjects.find(s => s.id === newSubjectId);
-    
+
     // Track the schedule change
     addScheduleChange({
       type: 'adaptation',
@@ -250,7 +250,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
         reason: 'Student preference'
       }
     });
-    
+
     toast.success('Subject changed successfully!');
   };
 
@@ -280,7 +280,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
     };
 
     setStudyPlan(updatedPlan);
-    
+
     // Track the schedule change
     addScheduleChange({
       type: 'adaptation',
@@ -316,9 +316,9 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
       <div className="relative">
         <div className="absolute -inset-1 bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 rounded-[24px] opacity-20 blur-lg"></div>
         <div className="relative flex items-center justify-between p-6 bg-gradient-to-r from-white/95 via-indigo-50/40 to-purple-50/40 backdrop-blur-xl rounded-[22px] border-2 border-white/60 shadow-2xl">
-          <Button 
-            onClick={() => navigateDay(-1)} 
-            variant="outline" 
+          <Button
+            onClick={() => navigateDay(-1)}
+            variant="outline"
             size="sm"
             className="group relative overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 border-2 border-indigo-200/50 bg-white/80 backdrop-blur px-6 py-5 rounded-2xl font-bold text-indigo-700"
           >
@@ -344,9 +344,9 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
               </span>
             </div>
           </div>
-          <Button 
-            onClick={() => navigateDay(1)} 
-            variant="outline" 
+          <Button
+            onClick={() => navigateDay(1)}
+            variant="outline"
             size="sm"
             className="group relative overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 border-2 border-indigo-200/50 bg-white/80 backdrop-blur px-6 py-5 rounded-2xl font-bold text-indigo-700"
           >
@@ -415,7 +415,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
               </div>
             </div>
             <div className="h-4 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm border border-white/30 shadow-inner">
-              <div 
+              <div
                 className="h-full bg-gradient-to-r from-white via-yellow-100 to-white rounded-full transition-all duration-1000 shadow-xl relative overflow-hidden"
                 style={{ width: `${completionPercentage}%` }}
               >
@@ -432,7 +432,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
           // Get reference links for this topic
           const referenceLinks = getReferenceLinks(session.topicId, session.subjectId);
           const getLinkIcon = (type: string) => {
-            switch(type) {
+            switch (type) {
               case 'video': return <Video className="w-3.5 h-3.5" />;
               case 'article': return <FileText className="w-3.5 h-3.5" />;
               case 'practice': return <PenTool className="w-3.5 h-3.5" />;
@@ -445,18 +445,18 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
           const cardGradient = session.status === 'completed'
             ? 'from-emerald-400 via-teal-500 to-green-500'
             : session.status === 'in-progress'
-            ? 'from-blue-400 via-cyan-500 to-indigo-500'
-            : session.status === 'skipped'
-            ? 'from-slate-300 to-gray-400'
-            : 'from-indigo-400 via-purple-500 to-pink-500';
+              ? 'from-blue-400 via-cyan-500 to-indigo-500'
+              : session.status === 'skipped'
+                ? 'from-slate-300 to-gray-400'
+                : 'from-indigo-400 via-purple-500 to-pink-500';
 
           const cardBg = session.status === 'completed'
             ? 'from-emerald-50/95 via-teal-50/95 to-green-50/95'
             : session.status === 'in-progress'
-            ? 'from-blue-50/95 via-cyan-50/95 to-indigo-50/95'
-            : session.status === 'skipped'
-            ? 'from-slate-50 to-gray-50'
-            : 'from-white via-indigo-50/30 to-purple-50/30';
+              ? 'from-blue-50/95 via-cyan-50/95 to-indigo-50/95'
+              : session.status === 'skipped'
+                ? 'from-slate-50 to-gray-50'
+                : 'from-white via-indigo-50/30 to-purple-50/30';
 
           return (
             <div
@@ -467,7 +467,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
               <div className={`relative overflow-hidden rounded-[26px] bg-gradient-to-br ${cardBg} backdrop-blur-xl p-7 shadow-2xl border-2 border-white/60 ${session.status !== 'skipped' && 'group-hover:scale-[1.02]'} transition-all duration-500`}>
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/20 to-transparent rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tl from-black/5 to-transparent rounded-full -ml-12 -mb-12"></div>
-                
+
                 <div className="relative flex items-start gap-5">
                   <div className="flex-shrink-0">
                     <div className="relative">
@@ -631,18 +631,16 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
       {/* Quiz Prompt Modal */}
       {completedSessionForQuiz && (
         <div
-          className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ${
-            quizPromptOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
+          className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ${quizPromptOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
           onClick={() => {
             setQuizPromptOpen(false);
             setCompletedSessionForQuiz(null);
           }}
         >
           <div
-            className={`bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all duration-300 ${
-              quizPromptOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
-            }`}
+            className={`bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all duration-300 ${quizPromptOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
+              }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center mb-6">
@@ -735,28 +733,28 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
                   ← Left Arrow
                 </kbd>
               </div>
-              
+
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
                 <span className="text-sm font-bold text-slate-700">Next Day</span>
                 <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
                   → Right Arrow
                 </kbd>
               </div>
-              
+
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
                 <span className="text-sm font-bold text-slate-700">Jump to Today</span>
                 <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
                   T
                 </kbd>
               </div>
-              
+
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
                 <span className="text-sm font-bold text-slate-700">Show Shortcuts</span>
                 <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
                   ?
                 </kbd>
               </div>
-              
+
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
                 <span className="text-sm font-bold text-slate-700">Close Modals</span>
                 <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">

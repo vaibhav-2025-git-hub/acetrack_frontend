@@ -18,6 +18,7 @@ export interface UserProfile {
   selectedSubjects?: string[];
   studyHoursPerDay: number;
   learningSpeed: LearningSpeed;
+  learningStyle: string;
   subjectDifficulties: Record<string, Difficulty>;
   startDate: string;
   totalDays: number;
@@ -35,7 +36,9 @@ export interface StudySession {
   startTime: string;
   duration: number; // in minutes
   status: SessionStatus;
+  completed: boolean;
   completionPercentage: number;
+  isRevision?: boolean;
   notes?: string;
   completedAt?: string; // timestamp when completed
 }
@@ -398,7 +401,7 @@ export interface StudyPlan {
   subjectTracking: Record<string, SubjectTracking>; // Track each subject
   parentAlerts: ParentAlert[]; // Alerts for parents
   scheduleChanges?: ScheduleChange[]; // Track all schedule modifications
-  
+
   // Study tools
   flashcards?: Flashcard[];
   notes?: StudyNote[];

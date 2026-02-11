@@ -4,7 +4,13 @@ import { useTheme } from "next-themes";
 import { Toaster as Sonner, ToasterProps } from "sonner";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
+  let theme = "system";
+  try {
+    const themeContext = useTheme();
+    theme = themeContext.theme || "system";
+  } catch (e) {
+    // next-themes not initialized or ThemeProvider missing
+  }
 
   return (
     <Sonner

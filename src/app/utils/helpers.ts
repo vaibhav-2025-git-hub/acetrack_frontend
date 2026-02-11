@@ -42,7 +42,7 @@ export function formatRelativeTime(date: string): string {
 // Format date in a consistent way
 export function formatDate(date: string | Date, format: 'short' | 'long' | 'full' = 'long'): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  
+
   switch (format) {
     case 'short':
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -179,8 +179,14 @@ export function cn(...classes: (string | boolean | undefined | null)[]): string 
 
 // Check if date is today
 export function isToday(date: string): boolean {
-  const today = new Date().toISOString().split('T')[0];
-  return date === today;
+  return toISODate(date) === toISODate(new Date());
+}
+
+// Normalize any date Input to YYYY-MM-DD
+export function toISODate(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+  return d.toISOString().split('T')[0];
 }
 
 // Check if date is in the past
@@ -209,7 +215,7 @@ export function formatScoreWithGrade(score: number): string {
   else if (score >= 70) grade = 'B';
   else if (score >= 60) grade = 'C';
   else if (score >= 50) grade = 'D';
-  
+
   return `${score}% (${grade})`;
 }
 

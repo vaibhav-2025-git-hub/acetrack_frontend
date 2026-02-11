@@ -13,20 +13,20 @@ import { QuizInterface } from './QuizInterface';
 import { ComprehensiveAnalytics } from './ComprehensiveAnalytics';
 import { exportToPDF } from '../utils/pdfExport';
 import { toast } from 'sonner';
-import { 
-  Trophy, 
-  Zap, 
-  Target, 
-  Calendar, 
-  Download, 
-  LogOut, 
-  CalendarDays, 
-  CalendarRange, 
-  Brain, 
-  TrendingUp, 
-  PieChart, 
-  BarChart3, 
-  Activity 
+import {
+  Trophy,
+  Zap,
+  Target,
+  Calendar,
+  Download,
+  LogOut,
+  CalendarDays,
+  CalendarRange,
+  Brain,
+  TrendingUp,
+  PieChart,
+  BarChart3,
+  Activity
 } from 'lucide-react';
 
 interface StudyDashboardProps {
@@ -59,8 +59,6 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
     todayTotal: 0
   });
 
-  if (!userProfile || !studyPlan) return null;
-
   const handleLogout = async () => {
     if (confirm('Are you sure you want to logout? All your data is safely saved.')) {
       try {
@@ -80,6 +78,25 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
       }
     }
   };
+
+  if (!userProfile || !studyPlan) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <h2 className="text-2xl font-bold text-gray-900">Loading your Study Dashboard...</h2>
+          <p className="text-gray-600 max-w-md mx-auto">
+            We're fetching your personalized study plan and progress.
+            If this takes too long, please try refreshing the page or logging out and back in.
+          </p>
+          <div className="flex gap-2 justify-center pt-4">
+            <Button onClick={() => window.location.reload()} variant="outline">Refresh Page</Button>
+            <Button onClick={handleLogout} variant="ghost">Logout</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleExportPDF = () => {
     toast.loading('Generating detailed PDF with all sessions...');
@@ -164,18 +181,18 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
 
     // Calculate streak (consecutive days with at least 1 completed session)
     let streak = 0;
-    const sortedDays = [...studyPlan.days].sort((a, b) => 
+    const sortedDays = [...studyPlan.days].sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-    
+
     for (let i = 0; i < sortedDays.length; i++) {
       const day = sortedDays[i];
       const dayDate = new Date(day.date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       if (dayDate > today) continue;
-      
+
       if (day.sessions.some(s => s.completed)) {
         streak++;
       } else {
@@ -221,7 +238,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-100/30 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-purple-100/30 rounded-full blur-3xl"></div>
       </div>
-      
+
       {/* Header */}
       <div className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -285,7 +302,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   <div>
                     <div className="text-white/90 font-bold text-sm mb-2 drop-shadow">Overall Progress</div>
                     <div className="h-3.5 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm border border-white/30 shadow-inner">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-white via-yellow-100 to-white rounded-full transition-all duration-1000 shadow-xl relative overflow-hidden"
                         style={{ width: `${stats.overallProgress}%` }}
                       >
@@ -353,7 +370,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                     <div className="text-white/90 font-bold text-sm mb-2 drop-shadow">Today's Goal</div>
                     <div className="flex items-center gap-3">
                       <div className="flex-1 h-3 bg-white/20 rounded-full overflow-hidden border border-white/30">
-                        <div 
+                        <div
                           className="h-full bg-gradient-to-r from-white to-cyan-100 rounded-full shadow-lg relative overflow-hidden transition-all duration-500"
                           style={{ width: `${stats.todayProgress}%` }}
                         >
@@ -416,11 +433,10 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                 <Button
                   variant={activeView === 'schedule' ? 'default' : 'outline'}
                   onClick={() => setActiveView('schedule')}
-                  className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${ 
-                    activeView === 'schedule' 
-                      ? 'bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 text-white shadow-2xl shadow-indigo-500/50 scale-105 border-2 border-white/20' 
-                      : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'
-                  }`}
+                  className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${activeView === 'schedule'
+                    ? 'bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 text-white shadow-2xl shadow-indigo-500/50 scale-105 border-2 border-white/20'
+                    : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'
+                    }`}
                 >
                   <Target className="w-5 h-5" />
                   <span>Study Schedule</span>
@@ -428,11 +444,10 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                 <Button
                   variant={activeView === 'study-tools' ? 'default' : 'outline'}
                   onClick={() => setActiveView('study-tools')}
-                  className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${
-                    activeView === 'study-tools' 
-                      ? 'bg-gradient-to-r from-blue-500 via-cyan-600 to-teal-600 text-white shadow-2xl shadow-blue-500/50 scale-105 border-2 border-white/20' 
-                      : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'
-                  }`}
+                  className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${activeView === 'study-tools'
+                    ? 'bg-gradient-to-r from-blue-500 via-cyan-600 to-teal-600 text-white shadow-2xl shadow-blue-500/50 scale-105 border-2 border-white/20'
+                    : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'
+                    }`}
                 >
                   <Brain className="w-5 h-5" />
                   <span>Study Tools</span>
@@ -440,11 +455,10 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                 <Button
                   variant={activeView === 'analytics' ? 'default' : 'outline'}
                   onClick={() => setActiveView('analytics')}
-                  className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${
-                    activeView === 'analytics' 
-                      ? 'bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 text-white shadow-2xl shadow-emerald-500/50 scale-105 border-2 border-white/20' 
-                      : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'
-                  }`}
+                  className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${activeView === 'analytics'
+                    ? 'bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 text-white shadow-2xl shadow-emerald-500/50 scale-105 border-2 border-white/20'
+                    : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'
+                    }`}
                 >
                   <TrendingUp className="w-5 h-5" />
                   <span>Analytics</span>
@@ -479,29 +493,29 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   <div className="p-8">
                     <Tabs defaultValue="daily">
                       <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-indigo-100/80 via-purple-100/80 to-pink-100/80 p-2 rounded-2xl border-2 border-white/50 shadow-xl mb-8">
-                        <TabsTrigger 
-                          value="daily" 
+                        <TabsTrigger
+                          value="daily"
                           className="flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-indigo-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105"
                         >
                           <Calendar className="w-4 h-4" />
                           <span>Daily</span>
                         </TabsTrigger>
-                        <TabsTrigger 
-                          value="weekly" 
+                        <TabsTrigger
+                          value="weekly"
                           className="flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-purple-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105"
                         >
                           <CalendarDays className="w-4 h-4" />
                           <span>Weekly</span>
                         </TabsTrigger>
-                        <TabsTrigger 
-                          value="monthly" 
+                        <TabsTrigger
+                          value="monthly"
                           className="flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-pink-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105"
                         >
                           <CalendarRange className="w-4 h-4" />
                           <span>Monthly</span>
                         </TabsTrigger>
                       </TabsList>
-                      
+
                       <TabsContent value="daily">
                         <DailyView currentDate={currentDate} setCurrentDate={setCurrentDate} onNavigateToQuiz={handleNavigateToQuiz} />
                       </TabsContent>
@@ -541,7 +555,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                     {(() => {
                       if (!studyPlan.days) return null;
                       const subjectStats = new Map<string, { total: number; completed: number }>();
-                      
+
                       studyPlan.days.forEach(day => {
                         day.sessions.forEach(session => {
                           const current = subjectStats.get(session.subjectId) || { total: 0, completed: 0 };
@@ -573,7 +587,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                             <span className="text-sm font-black text-slate-900">{subject.progress}%</span>
                           </div>
                           <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden ring-2 ring-slate-100">
-                            <div 
+                            <div
                               className={`h-full ${colors[idx % colors.length].bg} transition-all duration-500`}
                               style={{ width: `${subject.progress}%` }}
                             ></div>
@@ -604,7 +618,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   <div className="p-6 space-y-4">
                     {(() => {
                       if (!studyPlan.days) return null;
-                      
+
                       let totalMinutes = 0;
                       let completedMinutes = 0;
                       let totalSessions = 0;
@@ -634,7 +648,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                             </div>
                             <Activity className="w-8 h-8 text-blue-400" />
                           </div>
-                          
+
                           <div className="flex items-center justify-between p-4 bg-gradient-to-r from-cyan-50 to-teal-50 rounded-xl border border-cyan-100">
                             <div>
                               <p className="text-xs text-slate-600 font-semibold">Time Completed</p>
@@ -681,7 +695,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   </div>
                 </div>
                 <div className="p-8">
-                  <Tabs value={studyToolsTab} onValueChange={setStudyToolsTab}>
+                  <Tabs value={studyToolsTab} onValueChange={(val) => setStudyToolsTab(val as "flashcards" | "quizzes")}>
                     <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-blue-100/80 to-cyan-100/80 p-2 rounded-2xl border-2 border-white/50 shadow-xl">
                       <TabsTrigger value="flashcards" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-cyan-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105">
                         <span className="mr-2 text-base">📚</span> Flashcards
@@ -694,8 +708,8 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                       <FlashcardStudy />
                     </TabsContent>
                     <TabsContent value="quizzes" className="mt-8">
-                      <QuizInterface 
-                        topicId={selectedQuizData?.topicId} 
+                      <QuizInterface
+                        topicId={selectedQuizData?.topicId}
                         subjectId={selectedQuizData?.subjectId}
                         chapterId={selectedQuizData?.chapterId}
                         subjectName={selectedQuizData?.subjectName}

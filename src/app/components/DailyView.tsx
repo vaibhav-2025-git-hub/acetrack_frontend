@@ -40,7 +40,7 @@ interface DailyViewProps {
 }
 
 export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDate, onNavigateToQuiz }) => {
-  const { studyPlan, setStudyPlan, updateProgress, userProfile, addScheduleChange } = useStudyPlan();
+  const { studyPlan, setStudyPlan, updateProgress, userProfile, addScheduleChange, isParentMode } = useStudyPlan();
   const [customizeModalOpen, setCustomizeModalOpen] = useState(false);
   const [quizPromptOpen, setQuizPromptOpen] = useState(false);
   const [completedSessionForQuiz, setCompletedSessionForQuiz] = useState<any | null>(null);
@@ -181,6 +181,19 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
 
     setStudyPlan(updatedPlan);
 
+    // Sync to backend if authenticated and it's a real session ID (number), and NOT in parent mode
+    if (!isParentMode && session && !isNaN(Number(session.id))) {
+      try {
+        const { studyPlanAPI } = await import('../services/api');
+        await studyPlanAPI.updateSession(session.id, {
+          completed: status === 'completed',
+          // Could also sync duration if it was changed
+        });
+      } catch (e) {
+        console.warn("Failed to sync session status to server", e);
+      }
+    }
+
     // Update progress for the topic
     if (session && status === 'completed') {
       updateProgress(session.topicId, {
@@ -188,6 +201,21 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
         timeSpent: session.duration,
         lastStudied: currentDate,
       });
+
+      // Sync progress data to backend if NOT in parent mode
+      if (!isParentMode) {
+        try {
+          const { progressAPI } = await import('../services/api');
+          await progressAPI.update({
+            topic_id: session.topicId,
+            mastery_level: 100,
+            time_spent: session.duration,
+            last_studied: currentDate
+          });
+        } catch (e) {
+          console.warn("Failed to sync topic progress to server", e);
+        }
+      }
 
       // Simple success message
       toast.success(
@@ -337,10 +365,10 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
             </h2>
             <div className="flex items-center gap-3 justify-center mt-3">
               <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 text-sm font-bold border-2 border-indigo-200/50 shadow-lg shadow-indigo-500/20">
-                <span className="text-base">📚</span> {dailyPlan.totalHours.toFixed(1)}h planned
+                <span className="text-base">📚</span> {dailyPlan.totalHours.toFixed(1)}h Planned
               </span>
               <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 text-sm font-bold border-2 border-emerald-200/50 shadow-lg shadow-emerald-500/20">
-                <span className="text-base">✅</span> {dailyPlan.completedHours.toFixed(1)}h done
+                <span className="text-base">✅</span> {dailyPlan.completedHours.toFixed(1)}h Done
               </span>
             </div>
           </div>

@@ -13,7 +13,7 @@ export const WeeklyView: React.FC = () => {
   const today = new Date();
   const currentWeekStart = new Date(today);
   currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
-  
+
   const weekDays = [];
   for (let i = 0; i < 7; i++) {
     const date = new Date(currentWeekStart);
@@ -31,10 +31,10 @@ export const WeeklyView: React.FC = () => {
         const totalSessions = dailyPlan.sessions.length;
         const completedSessions = dailyPlan.sessions.filter(s => s.completed || s.status === 'completed').length;
         const completion = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
-        
+
         const totalMinutes = dailyPlan.sessions.reduce((sum, s) => sum + s.duration, 0);
         const totalHours = (totalMinutes / 60).toFixed(1);
-        
+
         const dayName = new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
         const isToday = dateStr === new Date().toISOString().split('T')[0];
 
@@ -51,7 +51,7 @@ export const WeeklyView: React.FC = () => {
                     <div className="flex items-center gap-3 mt-1">
                       <p className="text-sm text-slate-600 flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {totalSessions} sessions
+                        {totalSessions} Sessions
                       </p>
                       <p className="text-sm text-slate-600 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -61,9 +61,9 @@ export const WeeklyView: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-sm text-slate-600 mb-1">{completedSessions} / {totalSessions} completed</p>
+                      <p className="text-sm text-slate-600 mb-1">{completedSessions} / {totalSessions} Completed</p>
                       <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-500"
                           style={{ width: `${completion}%` }}
                         ></div>
@@ -82,14 +82,13 @@ export const WeeklyView: React.FC = () => {
                         {session.completed && <CheckCircle2 className="w-4 h-4 text-green-600" />}
                         <span className="font-semibold text-slate-900">{session.topicName}</span>
                       </div>
-                      <p className="text-xs text-slate-600 mt-1">{session.subjectId} • {session.chapterId}</p>
+                      <p className="text-xs text-slate-600 mt-1">{session.subjectName} • {session.chapterName}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-slate-600">{session.duration} min</span>
-                      <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
-                        session.completed ? 'bg-green-100 text-green-700' :
+                      <span className={`text-xs px-3 py-1 rounded-full font-semibold ${session.completed ? 'bg-green-100 text-green-700' :
                         'bg-blue-100 text-blue-700'
-                      }`}>
+                        }`}>
                         {session.completed ? 'Completed' : 'Pending'}
                       </span>
                     </div>

@@ -156,13 +156,11 @@ export const studyPlanAPI = {
     return { success: true };
   },
 
-  updateSession: async (sessionId: number, updates: any) => {
-    // return await apiRequest(`study-plan/session/${sessionId}`, {
-    //   method: 'PUT',
-    //   body: JSON.stringify(updates),
-    // });
-    console.warn('updateSession not fully implemented in backend');
-    return { success: true };
+  updateSession: async (sessionId: number | string, updates: { completed?: boolean; duration?: number }) => {
+    return await apiRequest(`study-plan/session/${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
   },
 };
 
@@ -262,6 +260,22 @@ export const quizzesAPI = {
     // });
     console.warn('getStats not fully implemented in backend');
     return { success: true, data: {} };
+  },
+};
+
+// Parent API
+export const parentAPI = {
+  getChildData: async () => {
+    return await apiRequest('parent/child-data', {
+      method: 'GET',
+    });
+  },
+
+  linkStudent: async (data: { studentCode: string; relationship?: string }) => {
+    return await apiRequest('parent/link', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 };
 

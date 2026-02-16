@@ -4,12 +4,12 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { 
-  BookOpen, 
-  FileText, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  BookOpen,
+  FileText,
+  Plus,
+  Edit,
+  Trash2,
   Save,
   Upload,
   Download,
@@ -20,9 +20,12 @@ import {
   Clock,
   Users,
   BarChart3,
-  Settings
+  Settings,
+  LogOut
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { authAPI } from '../services/api';
 
 interface Quiz {
   id: string;
@@ -52,6 +55,7 @@ interface CurriculumTopic {
 }
 
 export const FacultyDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('quizzes');
   const [quizzes, setQuizzes] = useState<Quiz[]>([
     {
@@ -137,7 +141,7 @@ export const FacultyDashboard: React.FC = () => {
 
     setQuizzes(quizzes.map(q => q.id === currentQuiz.id ? updatedQuiz : q));
     setCurrentQuiz(updatedQuiz);
-    
+
     // Reset form
     setNewQuestionData({
       question: '',
@@ -179,6 +183,13 @@ export const FacultyDashboard: React.FC = () => {
     quiz.subject.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleLogout = () => {
+    authAPI.logout();
+    toast.success('Logged out successfully');
+    navigate('/');
+    window.location.reload(); // Ensure state is cleared
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -197,6 +208,14 @@ export const FacultyDashboard: React.FC = () => {
             <Button className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-bold">
               <Settings className="w-4 h-4 mr-2" />
               Settings
+            </Button>
+            <Button
+              variant="outline"
+              className="ml-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-bold"
+              onClick={handleLogout}
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
             </Button>
           </div>
         </div>
@@ -285,7 +304,7 @@ export const FacultyDashboard: React.FC = () => {
                   <CardDescription className="text-slate-700 font-semibold">
                     Manage and edit your quiz collection
                   </CardDescription>
-                  
+
                   {/* Search */}
                   <div className="relative mt-4">
                     <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
@@ -302,11 +321,10 @@ export const FacultyDashboard: React.FC = () => {
                     {filteredQuizzes.map((quiz) => (
                       <div
                         key={quiz.id}
-                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                          currentQuiz?.id === quiz.id
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${currentQuiz?.id === quiz.id
                             ? 'border-green-500 bg-green-50'
                             : 'border-slate-200 bg-white hover:border-green-300'
-                        }`}
+                          }`}
                         onClick={() => setCurrentQuiz(quiz)}
                       >
                         <div className="flex items-start justify-between">

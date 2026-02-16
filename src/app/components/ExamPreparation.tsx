@@ -33,10 +33,10 @@ export const ExamPreparation: React.FC = () => {
     if (!exam) return;
 
     const today = new Date().toISOString().split('T')[0];
-    
+
     try {
       const crashCourse = generateCrashCourse(exam, userProfile, today, priority);
-      
+
       setStudyPlan({
         ...studyPlan,
         crashCourses: [...(studyPlan.crashCourses || []), crashCourse],
@@ -177,10 +177,10 @@ const ExamCard: React.FC<{
     readiness.overallReadiness >= 80
       ? 'text-green-600'
       : readiness.overallReadiness >= 60
-      ? 'text-blue-600'
-      : readiness.overallReadiness >= 40
-      ? 'text-yellow-600'
-      : 'text-red-600';
+        ? 'text-blue-600'
+        : readiness.overallReadiness >= 40
+          ? 'text-yellow-600'
+          : 'text-red-600';
 
   return (
     <Card className={`p-6 ${isUrgent ? 'border-2 border-orange-300 bg-orange-50' : ''}`}>
@@ -209,12 +209,16 @@ const ExamCard: React.FC<{
 
         {/* Subject Readiness */}
         <div className="grid grid-cols-2 gap-2">
-          {Object.entries(readiness.subjectReadiness).slice(0, 4).map(([subjectId, score]) => (
-            <div key={subjectId} className="p-2 bg-white rounded border border-gray-200">
-              <p className="text-xs text-gray-600 capitalize">{subjectId}</p>
-              <p className="text-lg font-bold text-indigo-600">{score}%</p>
-            </div>
-          ))}
+          {Object.entries(readiness.subjectReadiness).slice(0, 4).map(([subjectId, score]) => {
+            // Capitalize subject name (convert "physics" to "Physics")
+            const subjectName = subjectId.charAt(0).toUpperCase() + subjectId.slice(1);
+            return (
+              <div key={subjectId} className="p-2 bg-white rounded border border-gray-200">
+                <p className="text-xs text-gray-600 font-medium">{subjectName}</p>
+                <p className="text-lg font-bold text-indigo-600">{score}%</p>
+              </div>
+            );
+          })}
         </div>
 
         {/* Actions */}

@@ -46,11 +46,11 @@ export const SessionCustomizationModal: React.FC<SessionCustomizationModalProps>
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
@@ -72,7 +72,7 @@ export const SessionCustomizationModal: React.FC<SessionCustomizationModalProps>
 
         <div className="p-6 overflow-y-auto flex-1">
           <p className="text-sm text-gray-600 mb-4">
-            Drag to reorder, click to edit subject or duration
+            Drag to reorder, click to edit Subject or Duration
           </p>
 
           <div className="space-y-3">
@@ -83,11 +83,10 @@ export const SessionCustomizationModal: React.FC<SessionCustomizationModalProps>
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
-                className={`bg-gray-50 rounded-lg p-4 border-2 transition-all ${
-                  draggedIndex === index
+                className={`bg-gray-50 rounded-lg p-4 border-2 transition-all ${draggedIndex === index
                     ? 'border-blue-500 shadow-lg opacity-50'
                     : 'border-gray-200 hover:border-gray-300'
-                } ${session.status !== 'not-started' ? 'opacity-50' : ''}`}
+                  } ${session.status !== 'not-started' ? 'opacity-50' : ''}`}
               >
                 <div className="flex items-start gap-3">
                   <button

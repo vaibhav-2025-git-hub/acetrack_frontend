@@ -22,6 +22,8 @@ export interface UserProfile {
   subjectDifficulties: Record<string, Difficulty>;
   startDate: string;
   totalDays: number;
+  studentCode?: string;
+  email?: string;
 }
 
 export interface StudySession {
@@ -383,16 +385,7 @@ export interface StudyPlan {
   dailyPlans: Record<string, DailyPlan>;
   days: Array<{
     date: string;
-    sessions: Array<{
-      id: string;
-      topicId: string;
-      topicName: string;
-      chapterId: string;
-      chapterName: string;
-      subjectId: string;
-      duration: number;
-      completed: boolean;
-    }>;
+    sessions: StudySession[];
   }>;
   weeklySummaries: WeeklySummary[];
   overallProgress: number;
@@ -409,7 +402,7 @@ export interface StudyPlan {
   mindMaps?: MindMap[];
   exams?: Exam[];
   mockTests?: MockTest[];
-  crashCourses?: CrashCourse[][];
+  crashCourses?: CrashCourse[];
   syllabusTrackers?: Record<string, SyllabusTracker>;
   studyCircles?: string[]; // Circle IDs user is part of
   resourceLibrary?: ResourceLibrary;

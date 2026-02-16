@@ -34,7 +34,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
   if (profile.selectedSubjects && profile.selectedSubjects.length > 0) {
     subjects = subjects.filter(subject => profile.selectedSubjects?.includes(subject.id));
   }
-  
+
   logPlanGeneration(`Found ${subjects.length} subjects (selected by user)`);
 
   const dailyPlans: Record<string, DailyPlan> = {};
@@ -108,7 +108,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
   if (totalHoursNeeded > totalAvailableHours) {
     compressionFactor = totalAvailableHours / totalHoursNeeded;
     logPlanGeneration(`Applying compression factor: ${compressionFactor.toFixed(2)}`);
-    
+
     Object.keys(topicsBySubject).forEach((subjectId) => {
       topicsBySubject[subjectId] = topicsBySubject[subjectId].map((topic) => ({
         ...topic,
@@ -121,7 +121,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
   // IMPROVED DISTRIBUTION ALGORITHM - SIMPLIFIED
   // Collect all topics and flatten them into a single queue
   const allTopicsQueue: TopicWithMeta[] = [];
-  
+
   subjects.forEach((subject) => {
     const subjectTopics = topicsBySubject[subject.id];
     allTopicsQueue.push(...subjectTopics);
@@ -137,7 +137,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
   // Round-robin through subjects to create mixed daily plans
   const distributedTopics: TopicWithMeta[] = [];
   let maxTopicsInAnySubject = Math.max(...topicsBySubjectArray.map(s => s.topics.length));
-  
+
   for (let i = 0; i < maxTopicsInAnySubject; i++) {
     topicsBySubjectArray.forEach(subjectGroup => {
       if (subjectGroup.topics[i]) {
@@ -166,7 +166,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
     while (dailyHoursUsed < profile.studyHoursPerDay && currentTopicIndex < distributedTopics.length) {
       // Get current topic
       const topic = distributedTopics[currentTopicIndex];
-      
+
       // If starting new topic, set its hours
       if (remainingHoursInCurrentTopic === 0) {
         remainingHoursInCurrentTopic = topic.hours;
@@ -183,7 +183,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
       // Only create session if it's at least 30 minutes OR it's the last bit of the topic
       if (sessionHours >= 0.5 || remainingHoursInCurrentTopic < 1) {
         const actualSessionHours = Math.max(0.5, Math.min(sessionHours, remainingHoursInCurrentTopic));
-        
+
         const session: StudySession = {
           id: `session-${dateStr}-${sessions.length}`,
           topicId: topic.topicId,
@@ -198,6 +198,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
             .padStart(2, '0')}`,
           duration: Math.round(actualSessionHours * 60),
           status: 'not-started',
+          completed: false,
           completionPercentage: 0,
         };
 
@@ -270,6 +271,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
           .padStart(2, '0')}`,
         duration: Math.round(hoursPerSubject * 60),
         status: 'not-started',
+        completed: false,
         completionPercentage: 0,
       };
 
@@ -340,6 +342,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
       chapterId: session.chapterId,
       chapterName: session.chapterName,
       subjectId: session.subjectId,
+      subjectName: session.subjectName,
       duration: session.duration,
       completed: session.status === 'completed',
     }))
@@ -367,7 +370,7 @@ export const adaptPlanAfterSession = (
 ): StudyPlan => {
   const updatedPlan = { ...plan };
   const dailyPlan = updatedPlan.dailyPlans[date];
-  
+
   if (!dailyPlan) return plan;
 
   const sessionIndex = dailyPlan.sessions.findIndex(s => s.id === sessionId);
@@ -376,7 +379,7 @@ export const adaptPlanAfterSession = (
   // If mood is very low (1-2), adjust upcoming sessions
   if (mood <= 2) {
     logPlanGeneration(`Low mood detected (${mood}). Adapting plan...`);
-    
+
     // Reduce duration of remaining sessions today
     for (let i = sessionIndex + 1; i < dailyPlan.sessions.length; i++) {
       const session = dailyPlan.sessions[i];
@@ -406,7 +409,7 @@ export const reorderSession = (
 ): StudyPlan => {
   const updatedPlan = { ...plan };
   const dailyPlan = updatedPlan.dailyPlans[date];
-  
+
   if (!dailyPlan) return plan;
 
   const sessions = [...dailyPlan.sessions];
@@ -437,7 +440,7 @@ export const changeSessionSubject = (
 ): StudyPlan => {
   const updatedPlan = { ...plan };
   const dailyPlan = updatedPlan.dailyPlans[date];
-  
+
   if (!dailyPlan) return plan;
 
   const sessionIndex = dailyPlan.sessions.findIndex(s => s.id === sessionId);

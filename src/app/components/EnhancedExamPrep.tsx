@@ -7,20 +7,20 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useStudyPlan } from '../context/StudyPlanContext';
-import { 
-  Calendar, 
-  Target, 
-  BookOpen, 
-  TrendingUp, 
-  AlertCircle, 
-  CheckCircle2, 
-  Clock, 
-  Zap, 
-  Plus, 
-  X, 
-  Edit2, 
-  Trash2, 
-  FileText, 
+import {
+  Calendar,
+  Target,
+  BookOpen,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Zap,
+  Plus,
+  X,
+  Edit2,
+  Trash2,
+  FileText,
   Brain,
   Award,
   BarChart3,
@@ -45,7 +45,7 @@ export const EnhancedExamPrep: React.FC = () => {
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [newExam, setNewExam] = useState({
     name: '',
-    type: 'unit-test' as 'unit-test' | 'mid-term' | 'final-exam' | 'board-exam',
+    type: 'unit-test' as 'unit-test' | 'midterm' | 'final' | 'board-exam',
     date: '',
     subjects: [] as string[],
   });
@@ -64,10 +64,10 @@ export const EnhancedExamPrep: React.FC = () => {
     if (!exam) return;
 
     const today = new Date().toISOString().split('T')[0];
-    
+
     try {
       const crashCourse = generateCrashCourse(exam, userProfile, today, priority);
-      
+
       setStudyPlan({
         ...studyPlan,
         crashCourses: [...(studyPlan.crashCourses || []), crashCourse],
@@ -134,7 +134,7 @@ export const EnhancedExamPrep: React.FC = () => {
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">Exam Preparation Center</h2>
                 <p className="text-sm text-slate-600 mt-1 font-semibold">Plan, track, and ace your exams</p>
               </div>
-              <Button 
+              <Button
                 onClick={() => setShowCreateExam(!showCreateExam)}
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold shadow-lg"
               >
@@ -150,13 +150,13 @@ export const EnhancedExamPrep: React.FC = () => {
                   <Calendar className="w-5 h-5 text-indigo-600" />
                   Add New Exam
                 </h3>
-                
+
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="font-semibold">Exam Name</Label>
                       <Input
-                        placeholder="e.g., Physics Unit Test"
+                        placeholder="E.g., Physics Unit Test"
                         value={newExam.name}
                         onChange={(e) => setNewExam({ ...newExam, name: e.target.value })}
                       />
@@ -170,8 +170,8 @@ export const EnhancedExamPrep: React.FC = () => {
                         className="w-full px-3 py-2 border rounded-md border-slate-300"
                       >
                         <option value="unit-test">Unit Test</option>
-                        <option value="mid-term">Mid-Term</option>
-                        <option value="final-exam">Final Exam</option>
+                        <option value="midterm">Mid-Term</option>
+                        <option value="final">Final Exam</option>
                         <option value="board-exam">Board Exam</option>
                       </select>
                     </div>
@@ -195,11 +195,10 @@ export const EnhancedExamPrep: React.FC = () => {
                           key={subject}
                           type="button"
                           onClick={() => toggleSubject(subject)}
-                          className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${
-                            newExam.subjects.includes(subject)
-                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
-                              : 'bg-white border-2 border-slate-200 text-slate-700 hover:border-indigo-300'
-                          }`}
+                          className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${newExam.subjects.includes(subject)
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
+                            : 'bg-white border-2 border-slate-200 text-slate-700 hover:border-indigo-300'
+                            }`}
                         >
                           {subject}
                         </button>
@@ -426,13 +425,12 @@ const ExamCard: React.FC<{
           </div>
         </div>
         <div className="flex gap-2">
-          <Badge className={`${
-            isVeryUrgent 
-              ? 'bg-red-100 text-red-800 border-2 border-red-300 animate-pulse' 
-              : isUrgent 
-              ? 'bg-orange-100 text-orange-800' 
+          <Badge className={`${isVeryUrgent
+            ? 'bg-red-100 text-red-800 border-2 border-red-300 animate-pulse'
+            : isUrgent
+              ? 'bg-orange-100 text-orange-800'
               : 'bg-blue-100 text-blue-800'
-          } font-bold`}>
+            } font-bold`}>
             {daysUntil} {daysUntil === 1 ? 'day' : 'days'}
           </Badge>
           <button
@@ -468,17 +466,21 @@ const ExamCard: React.FC<{
         <div>
           <p className="text-sm font-bold text-slate-700 mb-2">Subject-wise Progress</p>
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(readiness.subjectReadiness).slice(0, 4).map(([subjectId, score]) => (
-              <div key={subjectId} className="p-3 bg-gradient-to-br from-white to-slate-50 rounded-xl border-2 border-slate-200">
-                <p className="text-xs text-slate-600 capitalize font-semibold">{subjectId}</p>
-                <div className="flex items-baseline gap-1">
-                  <p className="text-xl font-black text-indigo-600">{score}%</p>
-                  <div className="flex-1">
-                    <Progress value={score} className="h-1.5" />
+            {Object.entries(readiness.subjectReadiness).slice(0, 4).map(([subjectId, score]) => {
+              // Capitalize subject name (convert "physics" to "Physics")
+              const subjectName = subjectId.charAt(0).toUpperCase() + subjectId.slice(1);
+              return (
+                <div key={subjectId} className="p-3 bg-gradient-to-br from-white to-slate-50 rounded-xl border-2 border-slate-200">
+                  <p className="text-xs text-slate-600 font-semibold">{subjectName}</p>
+                  <div className="flex items-baseline gap-1">
+                    <p className="text-xl font-black text-indigo-600">{score}%</p>
+                    <div className="flex-1">
+                      <Progress value={score} className="h-1.5" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

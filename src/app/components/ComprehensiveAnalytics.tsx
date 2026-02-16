@@ -17,22 +17,23 @@ export const ComprehensiveAnalytics: React.FC = () => {
   }
 
   // Get days data from both possible sources
-  const daysData = studyPlan.days && studyPlan.days.length > 0 
-    ? studyPlan.days 
-    : studyPlan.dailyPlans 
+  const daysData = studyPlan.days && studyPlan.days.length > 0
+    ? studyPlan.days
+    : studyPlan.dailyPlans
       ? Object.values(studyPlan.dailyPlans).map(day => ({
-          date: day.date,
-          sessions: day.sessions.map(s => ({
-            id: s.id,
-            topicId: s.topicId,
-            topicName: s.topicName,
-            chapterId: s.chapterId,
-            chapterName: s.chapterName,
-            subjectId: s.subjectId,
-            duration: s.duration,
-            completed: s.completed || s.status === 'completed'
-          }))
+        date: day.date,
+        sessions: day.sessions.map(s => ({
+          id: s.id,
+          topicId: s.topicId,
+          topicName: s.topicName,
+          chapterId: s.chapterId,
+          chapterName: s.chapterName || s.chapterId,
+          subjectId: s.subjectId,
+          subjectName: s.subjectName || s.subjectId,
+          duration: s.duration,
+          completed: s.completed || s.status === 'completed'
         }))
+      }))
       : [];
 
   if (daysData.length === 0) {
@@ -45,36 +46,38 @@ export const ComprehensiveAnalytics: React.FC = () => {
 
   // Calculate comprehensive statistics
   const calculateStats = () => {
-    const subjectStats = new Map<string, { 
-      total: number; 
-      completed: number; 
-      totalMinutes: number; 
+    const subjectStats = new Map<string, {
+      name: string;
+      total: number;
+      completed: number;
+      totalMinutes: number;
       completedMinutes: number;
       topics: Set<string>;
     }>();
-    
+
     let totalSessions = 0;
     let completedSessions = 0;
     let totalMinutes = 0;
     let completedMinutes = 0;
     const dailyProgress: { date: string; completed: number; total: number; percentage: number }[] = [];
     const weeklyData: { week: string; sessions: number; hours: number }[] = [];
-    
+
     daysData.forEach((day, index) => {
       let dayCompleted = 0;
       let dayTotal = day.sessions.length;
-      
+
       day.sessions.forEach(session => {
         totalSessions++;
         totalMinutes += session.duration;
-        
+
         // Track subject stats
         const subjectKey = session.subjectId;
         if (!subjectStats.has(subjectKey)) {
-          subjectStats.set(subjectKey, { 
-            total: 0, 
-            completed: 0, 
-            totalMinutes: 0, 
+          subjectStats.set(subjectKey, {
+            name: session.subjectName || session.subjectId,
+            total: 0,
+            completed: 0,
+            totalMinutes: 0,
             completedMinutes: 0,
             topics: new Set()
           });
@@ -85,7 +88,7 @@ export const ComprehensiveAnalytics: React.FC = () => {
         if (session.topicId) {
           subjectData.topics.add(session.topicId);
         }
-        
+
         if (session.completed) {
           completedSessions++;
           completedMinutes += session.duration;
@@ -94,14 +97,14 @@ export const ComprehensiveAnalytics: React.FC = () => {
           subjectData.completedMinutes += session.duration;
         }
       });
-      
+
       dailyProgress.push({
         date: day.date,
         completed: dayCompleted,
         total: dayTotal,
         percentage: dayTotal > 0 ? Math.round((dayCompleted / dayTotal) * 100) : 0
       });
-      
+
       // Calculate weekly data
       const weekNum = Math.floor(index / 7);
       if (!weeklyData[weekNum]) {
@@ -113,7 +116,7 @@ export const ComprehensiveAnalytics: React.FC = () => {
 
     const subjects = Array.from(subjectStats.entries()).map(([id, stats]) => ({
       id,
-      name: id,
+      name: stats.name,
       progress: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
       completed: stats.completed,
       total: stats.total,
@@ -156,11 +159,11 @@ export const ComprehensiveAnalytics: React.FC = () => {
 
   // Calculate trends
   const recentWeeks = stats.weeklyData.slice(-2);
-  const weeklyTrend = recentWeeks.length === 2 
-    ? recentWeeks[1].sessions > recentWeeks[0].sessions 
-      ? 'up' 
-      : recentWeeks[1].sessions < recentWeeks[0].sessions 
-        ? 'down' 
+  const weeklyTrend = recentWeeks.length === 2
+    ? recentWeeks[1].sessions > recentWeeks[0].sessions
+      ? 'up'
+      : recentWeeks[1].sessions < recentWeeks[0].sessions
+        ? 'down'
         : 'stable'
     : 'stable';
 
@@ -196,7 +199,7 @@ export const ComprehensiveAnalytics: React.FC = () => {
             </div>
             <p className="text-3xl font-black text-slate-900">{stats.completedHours}h</p>
             <p className="text-sm text-slate-600 font-semibold mt-1">Study Time</p>
-            <p className="text-xs text-slate-500 mt-2">of {stats.totalHours}h total planned</p>
+            <p className="text-xs text-slate-500 mt-2">Of {stats.totalHours}h Total Planned</p>
           </div>
         </div>
 
@@ -226,7 +229,7 @@ export const ComprehensiveAnalytics: React.FC = () => {
             </div>
             <p className="text-3xl font-black text-slate-900">{stats.daysActive}</p>
             <p className="text-sm text-slate-600 font-semibold mt-1">Active Days</p>
-            <p className="text-xs text-slate-500 mt-2">of {daysData.length} total days</p>
+            <p className="text-xs text-slate-500 mt-2">Of {daysData.length} Total Days</p>
           </div>
         </div>
       </div>
@@ -253,32 +256,32 @@ export const ComprehensiveAnalytics: React.FC = () => {
                 <AreaChart data={stats.dailyProgress}>
                   <defs>
                     <linearGradient id="colorProgress" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis 
-                    dataKey="date" 
+                  <XAxis
+                    dataKey="date"
                     tick={{ fontSize: 12 }}
                     tickFormatter={(value) => new Date(value).getDate().toString()}
                   />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '2px solid #8b5cf6',
                       borderRadius: '12px',
                       boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
                     }}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="percentage" 
-                    stroke="#8b5cf6" 
+                  <Area
+                    type="monotone"
+                    dataKey="percentage"
+                    stroke="#8b5cf6"
                     strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorProgress)" 
+                    fillOpacity={1}
+                    fill="url(#colorProgress)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -307,9 +310,9 @@ export const ComprehensiveAnalytics: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="week" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '2px solid #06b6d4',
                       borderRadius: '12px',
                       boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
@@ -354,9 +357,9 @@ export const ComprehensiveAnalytics: React.FC = () => {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '2px solid #ec4899',
                       borderRadius: '12px',
                       boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
@@ -389,8 +392,8 @@ export const ComprehensiveAnalytics: React.FC = () => {
                   <div key={subject.id} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
+                        <div
+                          className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: COLORS[idx % COLORS.length] }}
                         ></div>
                         <span className="text-sm font-bold text-slate-700">{subject.name}</span>
@@ -398,9 +401,9 @@ export const ComprehensiveAnalytics: React.FC = () => {
                       <span className="text-sm font-black text-slate-900">{subject.progress}%</span>
                     </div>
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full transition-all duration-500"
-                        style={{ 
+                        style={{
                           width: `${subject.progress}%`,
                           backgroundColor: COLORS[idx % COLORS.length]
                         }}

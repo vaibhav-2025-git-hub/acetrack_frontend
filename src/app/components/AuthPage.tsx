@@ -50,6 +50,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
     // Parent fields
     parentName: '',
     studentName: '',
+    studentCode: '',
     studentClass: '',
     relationship: '',
     parentPhone: '',
@@ -150,6 +151,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
           password: formData.password,
           user_type: userType,
           name: userType === 'student' ? formData.fullName : userType === 'parent' ? formData.parentName : formData.facultyName,
+          // Parent specific fields
+          studentCode: userType === 'parent' ? formData.studentCode : undefined,
+          relationship: userType === 'parent' ? formData.relationship : undefined,
         };
 
         const response = await authAPI.register(registerData);
@@ -252,7 +256,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
                       <Input
                         id="email"
                         type="email"
-                        placeholder={userType === 'student' ? 'student@example.com' : 'parent@example.com'}
+                        placeholder={userType === 'student' ? 'Student@example.com' : 'Parent@example.com'}
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
@@ -365,7 +369,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
                       <Input
                         id="email"
                         type="email"
-                        placeholder="student@example.com"
+                        placeholder="Student@example.com"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
@@ -495,13 +499,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-semibold text-slate-700">Email</Label>
+                    <Label htmlFor="studentCode" className="text-sm font-semibold text-slate-700">Student's AceTrack ID (to link account)</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                      <Input
+                        id="studentCode"
+                        type="text"
+                        placeholder="ACE-XXXXXX"
+                        value={formData.studentCode}
+                        onChange={(e) => handleInputChange('studentCode', e.target.value)}
+                        className={`pl-10 ${errors.studentCode ? 'border-red-500' : ''}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-semibold text-slate-700">Your Email (Parent)</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                       <Input
                         id="email"
                         type="email"
-                        placeholder="parent@example.com"
+                        placeholder="Parent@example.com"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
@@ -603,7 +622,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
                       <Input
                         id="email"
                         type="email"
-                        placeholder="faculty@example.com"
+                        placeholder="Faculty@example.com"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}

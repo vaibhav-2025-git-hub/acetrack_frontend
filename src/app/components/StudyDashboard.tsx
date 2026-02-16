@@ -11,6 +11,7 @@ import { ProgressCharts } from './ProgressCharts';
 import { FlashcardStudy } from './FlashcardStudy';
 import { QuizInterface } from './QuizInterface';
 import { ComprehensiveAnalytics } from './ComprehensiveAnalytics';
+import { ParentDashboard } from './ParentDashboard';
 import { exportToPDF } from '../utils/pdfExport';
 import { toast } from 'sonner';
 import {
@@ -34,6 +35,7 @@ interface StudyDashboardProps {
 }
 
 export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
+  console.log("StudyDashboard rendered with userType:", userType);
   const { userProfile, studyPlan } = useStudyPlan();
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeView, setActiveView] = useState<'schedule' | 'study-tools' | 'analytics'>('schedule');
@@ -78,6 +80,26 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
       }
     }
   };
+
+  if (userType === 'parent') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-black text-slate-900">Parent Dashboard</h1>
+              <p className="text-slate-600">Monitor your child's study progress and performance</p>
+            </div>
+            <Button onClick={handleLogout} variant="outline" className="flex items-center gap-2">
+              <LogOut className="w-4 h-4" />
+              Logout
+            </Button>
+          </div>
+          <ParentDashboard />
+        </div>
+      </div>
+    );
+  }
 
   if (!userProfile || !studyPlan) {
     return (
@@ -127,19 +149,6 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
     setStudyToolsTab('quizzes');
     toast.success(`Opening quiz for ${sessionData.topicName}!`);
   };
-
-  if (userType === 'parent') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center py-12">
-            <h1 className="text-3xl font-black text-slate-900 mb-4">Parent Dashboard</h1>
-            <p className="text-slate-600">Coming soon - Monitor your child's study progress</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Calculate real-time statistics from actual data
   const calculateStats = () => {
@@ -264,6 +273,9 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">
                     <span>🏫</span> {userProfile.board.toUpperCase()}
                   </span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-green-50 text-green-700 text-xs font-bold border border-green-200">
+                    <span>🆔</span> {userProfile.studentCode || 'AceTrack ID'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -313,7 +325,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   <div className="pt-2 flex items-center gap-2 text-white/95 font-bold text-xs">
                     <Zap className="w-4 h-4" />
                     <span className="drop-shadow">
-                      {studyPlan.days?.filter(d => d.sessions.every(s => s.completed)).length || 0} / {studyPlan.days?.length || 0} days
+                      {studyPlan.days?.filter(d => d.sessions.every(s => s.completed)).length || 0} / {studyPlan.days?.length || 0} Days
                     </span>
                   </div>
                 </div>
@@ -554,11 +566,14 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   <div className="p-6 space-y-4">
                     {(() => {
                       if (!studyPlan.days) return null;
-                      const subjectStats = new Map<string, { total: number; completed: number }>();
+                      const subjectStats = new Map<string, { name: string; total: number; completed: number }>();
 
                       studyPlan.days.forEach(day => {
                         day.sessions.forEach(session => {
-                          const current = subjectStats.get(session.subjectId) || { total: 0, completed: 0 };
+                          // Capitalize subject name if subjectName is missing (physics -> Physics)
+                          const subjectName = session.subjectName ||
+                            (session.subjectId.charAt(0).toUpperCase() + session.subjectId.slice(1));
+                          const current = subjectStats.get(session.subjectId) || { name: subjectName, total: 0, completed: 0 };
                           current.total++;
                           if (session.completed) current.completed++;
                           subjectStats.set(session.subjectId, current);
@@ -567,6 +582,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
 
                       const subjects = Array.from(subjectStats.entries()).map(([id, stats]) => ({
                         id,
+                        name: stats.name,
                         progress: Math.round((stats.completed / stats.total) * 100),
                         completed: stats.completed,
                         total: stats.total
@@ -583,7 +599,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                       return subjects.map((subject, idx) => (
                         <div key={subject.id}>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-bold text-slate-700">{subject.id}</span>
+                            <span className="text-sm font-bold text-slate-700">{subject.name}</span>
                             <span className="text-sm font-black text-slate-900">{subject.progress}%</span>
                           </div>
                           <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden ring-2 ring-slate-100">

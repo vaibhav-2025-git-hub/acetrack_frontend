@@ -159,7 +159,7 @@ export const AISettings: React.FC = () => {
           </ol>
           <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-xs text-green-800">
-              <strong>✓ Free Tier:</strong> 60 requests per minute, more than enough for study needs!
+              <strong>✓ Free Tier:</strong> 60 Requests per minute, more than enough for study needs!
             </p>
           </div>
         </div>

@@ -123,13 +123,16 @@ const mapBackendPlanToFrontend = (backendPlan: any) => {
 
 const AppContent: React.FC = () => {
   console.log("AppContent rendering");
-  const { userProfile, setUserProfile, setStudyPlan, setProgressData } =
-    useStudyPlan();
+  const {
+    userProfile, setUserProfile,
+    setStudyPlan, setProgressData,
+    isAuthenticated, setIsAuthenticated,
+    setIsParentMode
+  } = useStudyPlan();
   const [currentStep, setCurrentStep] = useState<Step>("auth");
   const [tempProfile, setTempProfile] = useState<
     Partial<UserProfile>
   >({});
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userType, setUserType] = useState<
     "student" | "parent" | "faculty"
   >("student");
@@ -143,31 +146,104 @@ const AppContent: React.FC = () => {
       const savedPlan = localStorage.getItem("studyPlan");
 
       if (savedAuth === "true" && savedUserType) {
+        // Verify token first
+        try {
+          const { authAPI } = await import("./services/api");
+          const token = localStorage.getItem("acetrack_token");
+
+          if (!token) throw new Error("No token found");
+
+          const verifyRes = await authAPI.verifyToken(token).catch(() => ({ success: false }));
+
+          if (!verifyRes.success) {
+            console.warn("Token verification failed, clearing session");
+            localStorage.clear();
+            setIsAuthenticated(false);
+            setCurrentStep("auth");
+            return;
+          }
+        } catch (e) {
+          console.error("Session verification error", e);
+          localStorage.clear();
+          setIsAuthenticated(false);
+          setCurrentStep("auth");
+          return;
+        }
+
         setIsAuthenticated(true);
         const type = savedUserType as "student" | "parent" | "faculty";
         setUserType(type);
 
-        if (savedProfile && savedPlan) {
+        if (type === "parent") {
+          setIsParentMode(true);
+          console.log("Restoring parent session... Always fetching fresh child data to stay synced.");
           try {
-            setUserProfile(JSON.parse(savedProfile));
-            setStudyPlan(JSON.parse(savedPlan));
-            setCurrentStep("dashboard");
-            return;
+            const { parentAPI } = await import("./services/api");
+            const response = await parentAPI.getChildData();
+            if (response.success && response.data) {
+              const studentData = response.data;
+              console.log("Successfully fetched child data for parent:", studentData.profile?.name);
+
+              if (studentData.profile) {
+                setUserProfile(studentData.profile);
+                localStorage.setItem("userProfile", JSON.stringify(studentData.profile));
+              }
+              if (studentData.studyPlan) {
+                const mappedPlan = mapBackendPlanToFrontend(studentData.studyPlan);
+                setStudyPlan(mappedPlan as any);
+                localStorage.setItem("studyPlan", JSON.stringify(mappedPlan));
+              }
+              if (studentData.progress) {
+                const mappedProgress: Record<string, any> = {};
+                studentData.progress.forEach((p: any) => {
+                  mappedProgress[p.topic_id] = {
+                    topicId: p.topic_id,
+                    masteryLevel: parseFloat(p.mastery_level || 0),
+                    timeSpent: p.time_spent || 0,
+                    lastStudied: p.last_studied,
+                    notes: p.notes
+                  };
+                });
+                setProgressData(mappedProgress);
+                localStorage.setItem("progressData", JSON.stringify(mappedProgress));
+              }
+            } else {
+              console.warn("Parent is logged in but no child data found. Parent might not be linked yet.");
+            }
           } catch (e) {
-            console.error("Failed to parse saved profile/plan", e);
+            console.warn("Error fetching child data during session restoration", e);
           }
+          setCurrentStep("dashboard");
+          return;
+        }
+
+        setIsParentMode(false);
+        if (type === "faculty") {
+          console.log(`Restoring ${type} session... skipping profile fetch.`);
+          setCurrentStep("dashboard");
+          return;
         }
 
         // If data is missing but we're authenticated, we need to fetch from backend
         try {
           const { profileAPI, studyPlanAPI, progressAPI } = await import("./services/api");
 
-          console.log("Restoring session from backend...");
+          console.log("Restoring student session from backend...");
           const profileResponse = await profileAPI.get();
 
           if (profileResponse.success && profileResponse.data) {
-            setUserProfile(profileResponse.data);
-            localStorage.setItem("userProfile", JSON.stringify(profileResponse.data));
+            const rawProfile = profileResponse.data;
+            const profile: UserProfile = {
+              ...rawProfile,
+              learningSpeed: rawProfile.learning_speed || rawProfile.learningSpeed,
+              learningStyle: rawProfile.learning_style || rawProfile.learningStyle,
+              studyHoursPerDay: rawProfile.study_duration || rawProfile.studyHoursPerDay,
+              totalDays: rawProfile.study_duration || rawProfile.totalDays,
+              studentCode: rawProfile.student_code,
+              email: rawProfile.email
+            };
+            setUserProfile(profile);
+            localStorage.setItem("userProfile", JSON.stringify(profile));
 
             const [planRes, progRes] = await Promise.all([
               studyPlanAPI.get().catch(e => ({ success: false, error: e })),
@@ -206,6 +282,7 @@ const AppContent: React.FC = () => {
               setCurrentStep("dashboard");
             } else {
               // If no profile at all, send to auth
+              console.log("No profile found and not a parent/faculty, redirecting to auth");
               setIsAuthenticated(false);
               setCurrentStep("auth");
             }
@@ -213,6 +290,10 @@ const AppContent: React.FC = () => {
         } catch (e) {
           console.error("Critical error during session restoration", e);
         }
+      } else {
+        // No saved auth, ensure we start at auth
+        setIsAuthenticated(false);
+        setCurrentStep("auth");
       }
     };
 
@@ -238,9 +319,46 @@ const AppContent: React.FC = () => {
 
     // Parent also goes to dashboard (parent view)
     if (type === "parent") {
+      setIsParentMode(true);
+      try {
+        const { parentAPI } = await import("./services/api");
+        const response = await parentAPI.getChildData();
+        if (response.success && response.data) {
+          const studentData = response.data;
+          // Store child data in state/localStorage for ParentDashboard to consume
+          if (studentData.profile) {
+            setUserProfile(studentData.profile);
+            localStorage.setItem("userProfile", JSON.stringify(studentData.profile));
+          }
+          if (studentData.studyPlan) {
+            const mappedPlan = mapBackendPlanToFrontend(studentData.studyPlan);
+            setStudyPlan(mappedPlan as any);
+            localStorage.setItem("studyPlan", JSON.stringify(mappedPlan));
+          }
+          if (studentData.progress) {
+            const mappedProgress: Record<string, any> = {};
+            studentData.progress.forEach((p: any) => {
+              mappedProgress[p.topic_id] = {
+                topicId: p.topic_id,
+                masteryLevel: parseFloat(p.mastery_level || 0),
+                timeSpent: p.time_spent || 0,
+                lastStudied: p.last_studied,
+                notes: p.notes
+              };
+            });
+            setProgressData(mappedProgress);
+            localStorage.setItem("progressData", JSON.stringify(mappedProgress));
+          }
+          toast.success(`Linked to student: ${studentData.profile?.name || 'Your child'}`);
+        }
+      } catch (e) {
+        console.warn("Could not fetch child data for parent", e);
+      }
       setCurrentStep("dashboard");
       return;
     }
+
+    setIsParentMode(false);
 
     // For students
     // Check if backend says they have a profile (from login response)
@@ -258,7 +376,19 @@ const AppContent: React.FC = () => {
         console.log("Profile response:", profileResponse);
 
         if (profileResponse.success && profileResponse.data) {
-          const profile = profileResponse.data;
+          const rawProfile = profileResponse.data;
+
+          // Map snake_case to camelCase
+          const profile: UserProfile = {
+            ...rawProfile,
+            learningSpeed: rawProfile.learning_speed || rawProfile.learningSpeed,
+            learningStyle: rawProfile.learning_style || rawProfile.learningStyle,
+            studyHoursPerDay: rawProfile.study_duration || rawProfile.studyHoursPerDay,
+            totalDays: rawProfile.study_duration || rawProfile.totalDays,
+            studentCode: rawProfile.student_code, // Mapped from backend join
+            email: rawProfile.email
+          };
+
           setUserProfile(profile);
           localStorage.setItem("userProfile", JSON.stringify(profile));
 
@@ -269,7 +399,8 @@ const AppContent: React.FC = () => {
             }),
             progressAPI.get().catch(pre => {
               console.error("Progress fetch error", pre);
-              return { success: false };
+              // Return empty success to avoid blocking
+              return { success: true, data: [] };
             })
           ]);
 
@@ -285,6 +416,21 @@ const AppContent: React.FC = () => {
             const generatedPlan = generateImprovedStudyPlan(profile);
             setStudyPlan(generatedPlan);
             localStorage.setItem("studyPlan", JSON.stringify(generatedPlan));
+
+            // Sync generated plan to backend
+            try {
+              const planPayload = {
+                start_date: toISODate(profile.startDate || new Date()),
+                end_date: toISODate(new Date(Date.now() + (profile.totalDays || 30) * 24 * 60 * 60 * 1000)),
+                total_days: profile.totalDays || 30,
+                subjects: profile.selectedSubjects || [],
+                days: generatedPlan.days
+              };
+              await studyPlanAPI.create(planPayload);
+              console.log("Generated plan successfully synced to backend");
+            } catch (syncErr) {
+              console.error("Failed to sync generated plan to backend", syncErr);
+            }
           }
 
           if (progRes.success && progRes.data) {
@@ -368,8 +514,18 @@ const AppContent: React.FC = () => {
 
     setUserProfile(completeProfile);
 
-    // Save to backend
+    // Generate study plan
+    toast.loading("Generating your personalized study plan...");
+
     try {
+      const plan = generateImprovedStudyPlan(completeProfile);
+      setStudyPlan(plan);
+
+      // Save to local storage as immediate backup
+      localStorage.setItem("userProfile", JSON.stringify(completeProfile));
+      localStorage.setItem("studyPlan", JSON.stringify(plan));
+
+      // Import APIs
       const { profileAPI, studyPlanAPI } = await import("./services/api");
 
       // Map to backend format (snake_case)
@@ -387,40 +543,41 @@ const AppContent: React.FC = () => {
 
       await profileAPI.create(profilePayload);
 
-      // Create backend study plan
+      // Create backend study plan with full days/sessions
       const planPayload = {
         start_date: toISODate(completeProfile.startDate),
         end_date: toISODate(new Date(new Date(completeProfile.startDate).getTime() + completeProfile.totalDays * 24 * 60 * 60 * 1000)),
         total_days: completeProfile.totalDays,
-        subjects: completeProfile.selectedSubjects // Assuming backend accepts array of strings/IDs
+        subjects: completeProfile.selectedSubjects,
+        days: plan.days // Send full detailed plan
       };
 
       await studyPlanAPI.create(planPayload);
 
-    } catch (error) {
-      console.error("Failed to save profile/plan to backend", error);
-      toast.error("Warning: Could not save progress to server.");
-    }
-
-    // Generate study plan (Frontend version for immediate display)
-    toast.loading("Generating your personalized study plan...");
-    setTimeout(() => {
+      // Fetch fresh plan with DB IDs
       try {
-        const plan = generateImprovedStudyPlan(completeProfile);
-        setStudyPlan(plan);
-        // Save to local storage as backup/current session cache
-        localStorage.setItem("userProfile", JSON.stringify(completeProfile));
-        localStorage.setItem("studyPlan", JSON.stringify(plan));
-
-        toast.dismiss();
-        toast.success("Your study plan is ready!");
-        setCurrentStep("dashboard");
-      } catch (error) {
-        toast.error(
-          "Failed to generate study plan. Please try again.",
-        );
+        const freshPlanRes = await studyPlanAPI.get();
+        if (freshPlanRes.success && freshPlanRes.data) {
+          const mappedPlan = mapBackendPlanToFrontend(freshPlanRes.data);
+          if (mappedPlan) {
+            setStudyPlan(mappedPlan as any);
+            localStorage.setItem("studyPlan", JSON.stringify(mappedPlan));
+          }
+        }
+      } catch (innerError) {
+        console.warn("Failed to fetch fresh plan after creation", innerError);
       }
-    }, 2000);
+
+      toast.dismiss();
+      toast.success("Your study plan is ready!");
+      setCurrentStep("dashboard");
+
+    } catch (error) {
+      console.error("Failed to generate or save profile/plan", error);
+      toast.dismiss();
+      toast.error("Warning: Could not save progress to server. Local backup created.");
+      setCurrentStep("dashboard"); // Proceed anyway since local storage is set
+    }
   };
 
   // Get subjects for difficulty assessment

@@ -116,18 +116,22 @@ export const MoodInsightsDashboard: React.FC = () => {
             {Object.entries(insights.subjectMoods)
               .sort((a, b) => b[1].avgMood - a[1].avgMood)
               .slice(0, 5)
-              .map(([subjectId, data]) => (
-                <div key={subjectId} className="group flex items-center justify-between p-3 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-100 hover:shadow-md hover:scale-[1.02] transition-all">
-                  <span className="text-sm font-medium text-slate-700">{subjectId}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl group-hover:scale-110 transition-transform">{getMoodEmoji(data.avgMood)}</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-lg font-bold text-slate-900">{data.avgMood.toFixed(1)}</span>
-                      <span className="text-xs text-slate-400">({data.count})</span>
+              .map(([subjectId, data]) => {
+                // Capitalize subject name (convert "physics" to "Physics")
+                const subjectName = subjectId.charAt(0).toUpperCase() + subjectId.slice(1);
+                return (
+                  <div key={subjectId} className="group flex items-center justify-between p-3 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-100 hover:shadow-md hover:scale-[1.02] transition-all">
+                    <span className="text-sm font-medium text-slate-700">{subjectName}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl group-hover:scale-110 transition-transform">{getMoodEmoji(data.avgMood)}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg font-bold text-slate-900">{data.avgMood.toFixed(1)}</span>
+                        <span className="text-xs text-slate-400">({data.count})</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         </div>
 

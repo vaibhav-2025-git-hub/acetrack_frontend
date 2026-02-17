@@ -150,13 +150,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
           ? {
             date: day.date,
             sessions: updatedSessions.map(s => ({
-              id: s.id,
-              topicId: s.topicId,
-              topicName: s.topicName,
-              chapterId: s.chapterId,
-              chapterName: s.chapterName,
-              subjectId: s.subjectId,
-              duration: s.duration,
+              ...s, // Spread all properties to satisfy StudySession type
               completed: s.completed || s.status === 'completed'
             }))
           }
@@ -520,7 +514,78 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
                           )}
                         </div>
                         <h3 className="font-black text-xl text-slate-900 mb-1.5">{session.subjectName}</h3>
-                        <p className="text-sm text-slate-700 font-bold mb-1">{session.topicName}</p>
+                        {(() => {
+                          let displayTopicName = session.topicName;
+                          const isGeneric = !displayTopicName ||
+                            displayTopicName === 'Study Session' ||
+                            displayTopicName === 'Topic' ||
+                            displayTopicName === 'General' ||
+                            displayTopicName === 'Unassigned';
+
+                          if (isGeneric) {
+                            // If we have a topicId, try to find it
+                            if (session.topicId) {
+                              // 1. Try specific context lookup first (fast path)
+                              let foundTopic = null;
+                              if (userProfile?.board && userProfile?.class && userProfile?.stream) {
+                                const board = curriculumData.find(b => b.id === userProfile.board);
+                                const stream = board?.classes[userProfile.class]?.find(s => s.id === userProfile.stream);
+                                if (stream) {
+                                  // Search in stream
+                                  for (const sub of stream.subjects) {
+                                    for (const ch of sub.chapters) {
+                                      const t = ch.topics.find(top => top.id === session.topicId);
+                                      if (t) { foundTopic = t; break; }
+                                    }
+                                    if (foundTopic) break;
+                                  }
+                                }
+                              }
+
+                              // 2. Brute force lookup (slow path) if context failed
+                              if (!foundTopic) {
+                                for (const board of curriculumData) {
+                                  for (const classKey in board.classes) {
+                                    for (const stream of board.classes[classKey]) {
+                                      for (const sub of stream.subjects) {
+                                        for (const ch of sub.chapters) {
+                                          const t = ch.topics.find(top => top.id === session.topicId);
+                                          if (t) { foundTopic = t; break; }
+                                        }
+                                        if (foundTopic) break;
+                                      }
+                                      if (foundTopic) break;
+                                    }
+                                    if (foundTopic) break;
+                                  }
+                                  if (foundTopic) break;
+                                }
+                              }
+
+                              if (foundTopic) {
+                                displayTopicName = foundTopic.name;
+                              } else {
+                                // 3. Last resort: Format the ID
+                                if (session.topicId.startsWith('revision-')) {
+                                  displayTopicName = "Revision: " + session.subjectName;
+                                } else {
+                                  // "physics-laws" -> "Physics Laws"
+                                  displayTopicName = session.topicId
+                                    .split('-')
+                                    .filter(p => p !== 'topic' && p.length > 0)
+                                    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+                                    .join(' ');
+                                }
+                              }
+                            } else {
+                              // If NO topicId, use a sensible default based on subject
+                              displayTopicName = `${session.subjectName} Review`;
+                            }
+                          }
+                          return (
+                            <p className="text-sm text-slate-700 font-bold mb-1">{displayTopicName || 'General Session'}</p>
+                          );
+                        })()}
                         <p className="text-xs text-slate-600 font-semibold">{session.chapterName}</p>
                         {session.notes && (
                           <p className="text-xs text-slate-600 mt-3 italic bg-white/50 px-3 py-2 rounded-xl border border-slate-200">

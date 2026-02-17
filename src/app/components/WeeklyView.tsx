@@ -4,6 +4,7 @@ import { useStudyPlan } from '../context/StudyPlanContext';
 import { Progress } from './ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { ChevronDown, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { curriculumData } from '../data/curriculum';
 
 export const WeeklyView: React.FC = () => {
   const { studyPlan } = useStudyPlan();
@@ -80,7 +81,56 @@ export const WeeklyView: React.FC = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         {session.completed && <CheckCircle2 className="w-4 h-4 text-green-600" />}
-                        <span className="font-semibold text-slate-900">{session.topicName}</span>
+                        {(() => {
+                          let displayTopicName = session.topicName;
+                          const isGeneric = !displayTopicName ||
+                            displayTopicName === 'Study Session' ||
+                            displayTopicName === 'Topic' ||
+                            displayTopicName === 'General' ||
+                            displayTopicName === 'Unassigned';
+
+                          if (isGeneric) {
+                            if (session.topicId) {
+                              let foundTopic = null;
+
+                              // Brute force lookup since we don't have userProfile valid here easily without context complexity
+                              for (const board of curriculumData) {
+                                for (const classKey in board.classes) {
+                                  for (const stream of board.classes[classKey]) {
+                                    for (const sub of stream.subjects) {
+                                      for (const ch of sub.chapters) {
+                                        const t = ch.topics.find(top => top.id === session.topicId);
+                                        if (t) { foundTopic = t; break; }
+                                      }
+                                      if (foundTopic) break;
+                                    }
+                                    if (foundTopic) break;
+                                  }
+                                  if (foundTopic) break;
+                                }
+                                if (foundTopic) break;
+                              }
+
+                              if (foundTopic) {
+                                displayTopicName = foundTopic.name;
+                              } else {
+                                if (session.topicId.startsWith('revision-')) {
+                                  displayTopicName = "Revision";
+                                } else {
+                                  displayTopicName = session.topicId
+                                    .split('-')
+                                    .filter(p => p !== 'topic' && p.length > 0)
+                                    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+                                    .join(' ');
+                                }
+                              }
+                            } else {
+                              displayTopicName = session.subjectName || "Subject Review";
+                            }
+                          }
+
+                          return <span className="font-semibold text-slate-900">{displayTopicName || 'Session'}</span>;
+                        })()}
                       </div>
                       <p className="text-xs text-slate-600 mt-1">{session.subjectName} • {session.chapterName}</p>
                     </div>

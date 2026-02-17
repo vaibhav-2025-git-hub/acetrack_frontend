@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -8,6 +8,7 @@ import { Brain, Clock, CheckCircle2, XCircle, Award, TrendingUp, Play } from 'lu
 import { QuizQuestion, QuizAttempt } from '../types';
 import { generateQuizForTopic, calculateQuizScore, analyzeQuizPerformance } from '../utils/quizGenerator';
 import { curriculumData } from '../data/curriculum';
+import { quizzesAPI } from '../services/api';
 import { toast } from 'sonner';
 
 interface QuizInterfaceProps {
@@ -19,13 +20,13 @@ interface QuizInterfaceProps {
   topicName?: string;
 }
 
-export const QuizInterface: React.FC<QuizInterfaceProps> = ({ 
-  topicId, 
-  subjectId, 
+export const QuizInterface: React.FC<QuizInterfaceProps> = ({
+  topicId,
+  subjectId,
   chapterId,
   subjectName,
   chapterName,
-  topicName 
+  topicName
 }) => {
   const { studyPlan, setStudyPlan, userProfile, addScheduleChange } = useStudyPlan();
   const [quizState, setQuizState] = useState<'setup' | 'in-progress' | 'completed'>('setup');
@@ -38,6 +39,42 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
   const [selectedTopic, setSelectedTopic] = useState<string>(topicId || '');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [questionCount, setQuestionCount] = useState(5);
+  const [facultyQuizzes, setFacultyQuizzes] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadFacultyQuizzes = async () => {
+      try {
+        const res = await quizzesAPI.getAll();
+        if (res.success) setFacultyQuizzes(res.data);
+      } catch (e) {
+        console.error("Failed to load faculty quizzes");
+      }
+    };
+    loadFacultyQuizzes();
+  }, []);
+
+  const startFacultyQuiz = (quiz: any) => {
+    if (!quiz.questions || quiz.questions.length === 0) {
+      toast.error("This quiz has no questions yet.");
+      return;
+    }
+
+    const questions: QuizQuestion[] = quiz.questions.map((q: any) => ({
+      id: q.id.toString(),
+      subjectId: quiz.subject,
+      difficulty: q.difficulty,
+      question: q.question,
+      options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+      correctAnswer: q.correct_answer,
+      explanation: q.explanation
+    }));
+
+    setCurrentQuestions(questions);
+    setAnswers(new Array(questions.length).fill(-1));
+    setCurrentQuestionIndex(0);
+    setStartTime(new Date());
+    setQuizState('in-progress');
+  };
 
   if (!studyPlan || !userProfile) return null;
 
@@ -117,8 +154,11 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
       quizzes: [...recentAttempts, attempt],
     });
 
+    // Save to backend
+    saveQuizAttemptToBackend(attempt);
+
     setQuizState('completed');
-    
+
     // Handle rescheduling based on score
     if (score < 50) {
       // Compulsory reschedule
@@ -145,7 +185,7 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
     const subject = subjects.find(s => s.id === subjectId);
     const chapter = subject?.chapters.find(c => c.topics.some(t => t.id === topicId));
     const topic = chapter?.topics.find(t => t.id === topicId);
-    
+
     if (!topic || !subject) {
       toast.error('Could not reschedule topic');
       return;
@@ -159,18 +199,19 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
 
     // Create or update the daily plan for that date
     const updatedPlan = { ...studyPlan };
-    
+
     if (!updatedPlan.dailyPlans[targetDateStr]) {
       updatedPlan.dailyPlans[targetDateStr] = {
         date: targetDateStr,
         sessions: [],
         totalHours: 0,
         completedHours: 0,
+        burnoutLevel: 0,
       };
     }
 
     const dailyPlan = updatedPlan.dailyPlans[targetDateStr];
-    
+
     // Add revision session
     const revisionSession = {
       id: `revision-${Date.now()}`,
@@ -184,6 +225,10 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
       status: 'not-started' as const,
       isRevision: true,
       notes: `Revision due to quiz score: ${score}%`,
+      date: targetDateStr,
+      startTime: '09:00',
+      completed: false,
+      completionPercentage: 0,
     };
 
     dailyPlan.sessions.push(revisionSession);
@@ -198,10 +243,7 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
       description: `Added revision session for "${topic.name}" based on quiz performance`,
       details: {
         subject: subject.name,
-        topic: topic.name,
-        reason: `Quiz score: ${score}% - ${type === 'compulsory' ? 'Automatic rescheduling' : 'Student requested practice'}`,
-        date: targetDateStr,
-        sessionType: 'Revision Session'
+        reason: `${topic.name}: Quiz score ${score}% - ${type === 'compulsory' ? 'Automatic rescheduling' : 'Student requested practice'}`,
       }
     });
 
@@ -209,6 +251,35 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
       duration: 4000,
     });
   };
+
+  const saveQuizAttemptToBackend = async (attempt: QuizAttempt) => {
+    try {
+      await quizzesAPI.submit({
+        subjectId: attempt.subjectId,
+        topicId: attempt.topicId,
+        totalQuestions: attempt.questions.length,
+        correctAnswers: attempt.answers.filter((a, i) => a === attempt.questions[i].correctAnswer).length,
+        score: attempt.score,
+        timeTaken: attempt.timeSpent,
+        quizData: { questions: attempt.questions, answers: attempt.answers }
+      });
+      // toast.success("Result saved to server"); // Optional, maybe too noisy
+    } catch (e) {
+      console.error("Failed to save quiz attempt", e);
+    }
+  };
+
+  // Trigger save when quiz completes
+  useEffect(() => {
+    if (quizState === 'completed' && recentAttempts.length > 0) {
+      const lastAttempt = recentAttempts[recentAttempts.length - 1];
+      // Ensure we haven't already saved it (simple check: if it's the very last one added)
+      // Better: submitQuiz calls this directly.
+    }
+  }, [quizState, recentAttempts]);
+
+  // Better approach: Call it in submitQuiz directly
+
 
   const resetQuiz = () => {
     setQuizState('setup');
@@ -221,6 +292,32 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
   if (quizState === 'setup') {
     return (
       <div className="space-y-6">
+        {/* Assigned Quizzes */}
+        <Card className="p-6">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Award className="w-5 h-5 text-purple-500" />
+            Assigned Quizzes from Faculty
+          </h3>
+          {facultyQuizzes.length === 0 ? (
+            <p className="text-gray-500 text-sm">No quizzes assigned yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {facultyQuizzes.map((quiz) => (
+                <div key={quiz.id} className="p-4 rounded-lg border border-purple-100 bg-purple-50/50 hover:bg-purple-50 transition-colors flex justify-between items-center">
+                  <div>
+                    <h4 className="font-semibold text-purple-900">{quiz.title}</h4>
+                    <p className="text-xs text-purple-600 mt-1">{quiz.subject} • Class {quiz.class}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{quiz.questions?.length || 0} Questions</p>
+                  </div>
+                  <Button size="sm" onClick={() => startFacultyQuiz(quiz)} className="bg-purple-600 hover:bg-purple-700 text-white">
+                    Start
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
         {/* Recent Attempts */}
         {recentAttempts.length > 0 && (
           <Card className="p-6">
@@ -390,19 +487,17 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
               <button
                 key={index}
                 onClick={() => handleAnswerSelect(index)}
-                className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
-                  answers[currentQuestionIndex] === index
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
+                className={`w-full p-4 text-left rounded-lg border-2 transition-all ${answers[currentQuestionIndex] === index
+                  ? 'border-indigo-500 bg-indigo-50'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      answers[currentQuestionIndex] === index
-                        ? 'border-indigo-500 bg-indigo-500'
-                        : 'border-gray-300'
-                    }`}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${answers[currentQuestionIndex] === index
+                      ? 'border-indigo-500 bg-indigo-500'
+                      : 'border-gray-300'
+                      }`}
                   >
                     {answers[currentQuestionIndex] === index && (
                       <CheckCircle2 className="w-4 h-4 text-white" />
@@ -429,13 +524,12 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
             {currentQuestions.map((_, index) => (
               <div
                 key={index}
-                className={`w-3 h-3 rounded-full ${
-                  answers[index] !== -1
-                    ? 'bg-indigo-500'
-                    : index === currentQuestionIndex
+                className={`w-3 h-3 rounded-full ${answers[index] !== -1
+                  ? 'bg-indigo-500'
+                  : index === currentQuestionIndex
                     ? 'bg-gray-400'
                     : 'bg-gray-200'
-                }`}
+                  }`}
               />
             ))}
           </div>
@@ -485,9 +579,8 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
             return (
               <div
                 key={question.id}
-                className={`p-4 rounded-lg border-2 ${
-                  isCorrect ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
-                }`}
+                className={`p-4 rounded-lg border-2 ${isCorrect ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+                  }`}
               >
                 <div className="flex items-start gap-3 mb-2">
                   {isCorrect ? (

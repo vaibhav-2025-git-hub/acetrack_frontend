@@ -27,8 +27,11 @@ import {
   TrendingUp,
   PieChart,
   BarChart3,
-  Activity
+  Activity,
+  Bell
 } from 'lucide-react';
+import { notificationAPI } from '../services/api';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface StudyDashboardProps {
   userType: 'student' | 'parent';
@@ -60,6 +63,44 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
     todayCompleted: 0,
     todayTotal: 0
   });
+
+  // Notifications
+  interface Notification {
+    id: number;
+    title: string;
+    message: string;
+    type: string;
+    is_read: boolean;
+    created_at: string;
+  }
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      const response = await notificationAPI.getAll();
+      if (response.success) {
+        setNotifications(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to load notifications");
+    }
+  };
+
+  const handleMarkRead = async (id: number) => {
+    try {
+      await notificationAPI.markRead(id);
+      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (error) {
+      console.error("Failed to mark read");
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const handleLogout = async () => {
     if (confirm('Are you sure you want to logout? All your data is safely saved.')) {
@@ -280,6 +321,46 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+              <Popover open={showNotifications} onOpenChange={setShowNotifications}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="relative font-medium px-3 py-2 rounded-lg bg-white border-gray-200 hover:bg-gray-50 text-gray-700">
+                    <Bell className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0 shadow-xl border-gray-200 rounded-xl" align="end">
+                  <div className="p-4 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
+                    <h4 className="font-semibold text-gray-900">Notifications</h4>
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-gray-500">No new notifications</div>
+                    ) : (
+                      notifications.map(n => (
+                        <div
+                          key={n.id}
+                          className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${!n.is_read ? 'bg-indigo-50/30' : ''}`}
+                          onClick={() => handleMarkRead(n.id)}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!n.is_read ? 'bg-indigo-500' : 'bg-gray-300'}`} />
+                            <div>
+                              <p className={`text-sm ${!n.is_read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{n.title}</p>
+                              <p className="text-xs text-gray-500 mt-1 leading-relaxed">{n.message}</p>
+                              <p className="text-[10px] text-gray-400 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <Button onClick={handleExportPDF} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg shadow-sm flex-1 lg:flex-none">
                 <Download className="w-4 h-4 mr-2" />
                 Export PDF

@@ -4,6 +4,7 @@
  */
 
 // Get API base URL from environment variable or use default
+// @ts-ignore
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 // Storage keys
@@ -36,7 +37,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<
   };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    (headers as any)['Authorization'] = `Bearer ${token}`;
   }
 
   const config: RequestInit = {
@@ -75,7 +76,7 @@ export const authAPI = {
     return response;
   },
 
-  login: async (credentials: { email: string; password: string }) => {
+  login: async (credentials: { email: string; password: string; user_type?: string }) => {
     const response = await apiRequest('auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
@@ -235,8 +236,32 @@ export const flashcardsAPI = {
   },
 };
 
+// Curriculum API
+export const curriculumAPI = {
+  getAll: async () => apiRequest('curriculum', { method: 'GET' }),
+  add: async (data: any) => apiRequest('curriculum', { method: 'POST', body: JSON.stringify(data) }),
+  delete: async (id: string) => apiRequest(`curriculum/${id}`, { method: 'DELETE' }),
+};
+
+// Notification API
+export const notificationAPI = {
+  getAll: async (userId?: string) => {
+    let url = 'notifications';
+    if (userId) url += `?userId=${userId}`;
+    return apiRequest(url, { method: 'GET' });
+  },
+  markRead: async (id: number) => apiRequest(`notifications/${id}/read`, { method: 'PUT' }),
+};
+
 // Quizzes API
 export const quizzesAPI = {
+  getAll: async () => apiRequest('quiz', { method: 'GET' }),
+  create: async (data: any) => apiRequest('quiz', { method: 'POST', body: JSON.stringify(data) }),
+  delete: async (id: string) => apiRequest(`quiz/${id}`, { method: 'DELETE' }),
+
+  addQuestion: async (quizId: string, data: any) => apiRequest(`quiz/${quizId}/questions`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteQuestion: async (questionId: string) => apiRequest(`quiz/questions/${questionId}`, { method: 'DELETE' }),
+
   submit: async (quizData: any) => {
     return await apiRequest('quiz/attempt', {
       method: 'POST',
@@ -254,12 +279,9 @@ export const quizzesAPI = {
   },
 
   getStats: async () => {
-    // Not implemented in backend yet
-    // return await apiRequest('quiz/stats', {
-    //   method: 'GET',
-    // });
-    console.warn('getStats not fully implemented in backend');
-    return { success: true, data: {} };
+    return await apiRequest('quiz/stats', {
+      method: 'GET',
+    });
   },
 };
 

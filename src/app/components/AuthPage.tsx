@@ -134,6 +134,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         const response = await authAPI.login({
           email: formData.email,
           password: formData.password,
+          user_type: userType,
         });
 
         toast.success(`Welcome back! Logging in as ${response.data.user_type}...`);
@@ -174,20 +175,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
     }
   };
 
-  const handleDemoLogin = () => {
-    toast.success('Demo login successful! 🎓');
-    setTimeout(() => {
-      onLogin('student', {
-        email: 'demo@student.com',
-        type: 'student',
-        name: 'Demo Student',
-        class: '11',
-        board: 'CBSE',
-        stream: 'Science PCM',
-        isReturningUser: false, // Demo goes through setup to showcase features
-      });
-    }, 500);
-  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-6">

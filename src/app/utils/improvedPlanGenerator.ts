@@ -1,6 +1,5 @@
 import { UserProfile, StudyPlan, DailyPlan, StudySession, WeeklySummary } from '../types';
 import { curriculumData, Subject, Topic } from '../data/curriculum';
-import { initializeSubjectTracking } from './subjectTracker';
 
 // Logging for debugging
 const logPlanGeneration = (message: string, data?: any) => {
@@ -103,6 +102,14 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
   const totalAvailableHours = studyDays * profile.studyHoursPerDay;
   logPlanGeneration(`Total hours needed: ${totalHoursNeeded.toFixed(1)}, Available: ${totalAvailableHours.toFixed(1)}`);
 
+  // WORKLOAD BALANCING: Calculate target hours per day to spread evenly
+  // But don't exceed the user's requested maximum
+  const targetDailyHours = Math.min(
+    profile.studyHoursPerDay,
+    Math.max(2, totalHoursNeeded / studyDays) // Minimum 2 hours if curriculum is very light
+  );
+  logPlanGeneration(`Target daily hours for balancing: ${targetDailyHours.toFixed(1)}`);
+
   // Compress if needed
   let compressionFactor = 1;
   if (totalHoursNeeded > totalAvailableHours) {
@@ -162,8 +169,8 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
     const sessions: StudySession[] = [];
     let dailyHoursUsed = 0;
 
-    // Fill the day up to studyHoursPerDay
-    while (dailyHoursUsed < profile.studyHoursPerDay && currentTopicIndex < distributedTopics.length) {
+    // Fill the day up to targetDailyHours
+    while (dailyHoursUsed < targetDailyHours && currentTopicIndex < distributedTopics.length) {
       // Get current topic
       const topic = distributedTopics[currentTopicIndex];
 
@@ -173,7 +180,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
       }
 
       // Calculate session duration (max 2 hours per session, or what's left in day)
-      const remainingHoursToday = profile.studyHoursPerDay - dailyHoursUsed;
+      const remainingHoursToday = targetDailyHours - dailyHoursUsed;
       const sessionHours = Math.min(
         remainingHoursInCurrentTopic,
         remainingHoursToday,
@@ -254,7 +261,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
 
     const revisionSessions: StudySession[] = [];
     let dailyHours = 0;
-    const hoursPerSubject = profile.studyHoursPerDay / subjects.length;
+    const hoursPerSubject = targetDailyHours / subjects.length;
 
     subjects.forEach((subject, idx) => {
       const session: StudySession = {
@@ -312,8 +319,6 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
       endDate: weekEnd.toISOString().split('T')[0],
       totalPlannedHours: weeklyPlannedHours,
       completedHours: 0,
-      averageMood: 3,
-      burnoutLevel: 0,
       weakSubjects: [],
       strongSubjects: [],
       streak: 0,
@@ -322,29 +327,11 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
 
   logPlanGeneration('Plan generation complete');
 
-  // Initialize subject tracking for all subjects
-  const subjectTracking: Record<string, any> = {};
-  subjects.forEach((subject) => {
-    subjectTracking[subject.id] = initializeSubjectTracking(
-      subject.id,
-      subject.name,
-      profile.startDate
-    );
-  });
-
   // Convert dailyPlans to days array for new component structure
   const days = Object.values(dailyPlans).map(day => ({
     date: day.date,
     sessions: day.sessions.map(session => ({
-      id: session.id,
-      topicId: session.topicId,
-      topicName: session.topicName,
-      chapterId: session.chapterId,
-      chapterName: session.chapterName,
-      subjectId: session.subjectId,
-      subjectName: session.subjectName,
-      duration: session.duration,
-      completed: session.status === 'completed',
+      ...session
     }))
   }));
 
@@ -355,9 +342,8 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
     overallProgress: 0,
     currentStreak: 0,
     longestStreak: 0,
-    moodHistory: [], // Initialize empty mood history
-    subjectTracking, // Add subject tracking
-    parentAlerts: [], // Initialize empty parent alerts
+    subjectTracking: {},
+    parentAlerts: [],
   };
 };
 

@@ -2,86 +2,109 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { useStudyPlan } from '../context/StudyPlanContext';
 import { Progress } from './ui/progress';
-import { TrendingUp, TrendingDown, AlertTriangle, Award, Users } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
+import { TrendingUp, TrendingDown, AlertTriangle, Award, Users, Clock, Eye, Activity, Sparkles, Star, CheckCircle2, Target, ShieldCheck, ArrowRight, Bell, BookOpen, PieChart as LucidePieChart } from 'lucide-react';
+import { LineChart, Line, PieChart, Pie, Cell, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { PsychometricResults } from './PsychometricResults';
 
 export const ParentDashboard: React.FC = () => {
-  const { userProfile, studyPlan } = useStudyPlan();
+  const { userProfile, studyPlan, setUserProfile, setStudyPlan } = useStudyPlan();
+  const [quizHistory, setQuizHistory] = React.useState<any[]>([]);
+  const [skippedSessions, setSkippedSessions] = React.useState<any[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  // If no student is linked, show the Link Account form
-  if (!userProfile) {
+  React.useEffect(() => {
+    const fetchChildData = async () => {
+      try {
+        const { parentAPI } = await import('../services/api');
+        const res = await parentAPI.getChildData();
+        if (res.success) {
+          if (res.data.quizHistory) setQuizHistory(res.data.quizHistory);
+          if (res.data.skippedSessions) setSkippedSessions(res.data.skippedSessions);
+
+          if (res.data.profile || res.data.basic_info) {
+            const rawProfile = res.data.profile || {};
+            const basicInfo = res.data.basic_info || {};
+
+            // Map the profile data
+            const mappedProfile = {
+              ...rawProfile,
+              name: rawProfile.name || basicInfo.name || "Student",
+              email: rawProfile.email || basicInfo.email,
+              studentCode: basicInfo.student_code || rawProfile.studentCode,
+              class: rawProfile.class || "N/A",
+              board: rawProfile.board || "N/A",
+              stream: rawProfile.stream || "N/A",
+              learningSpeed: rawProfile.learning_speed || rawProfile.learningSpeed,
+              learningStyle: rawProfile.learning_style || rawProfile.learningStyle,
+              psychometricDetails: rawProfile.psychometric_details || rawProfile.psychometricDetails
+            };
+            setUserProfile(mappedProfile);
+          }
+
+          if (res.data.studyPlan) {
+            // Need to map backend plan to frontend if needed, but for ParentDashboard 
+            // it mainly uses dailyPlans or days. 
+            // The backend returns daily_plans. We should map it to match studyPlan structure.
+            import('../utils/helpers').then(({ mapBackendPlanToFrontend }) => {
+              const mappedPlan = mapBackendPlanToFrontend(res.data.studyPlan);
+              setStudyPlan(mappedPlan as any);
+            });
+          }
+        } else {
+          setErrorMsg(res.message || "Failed to load student data.");
+        }
+      } catch (error) {
+        console.error("Failed to fetch child extra data", error);
+        setErrorMsg("Failed to load student data. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchChildData();
+  }, []);
+
+  if (isLoading) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center p-6">
-        <Card className="max-w-md w-full border-blue-200 bg-blue-50 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-blue-900 flex items-center gap-2">
-              <Users className="w-6 h-6" />
-              Link Your Child's Account
-            </CardTitle>
-            <div className="text-sm text-blue-700 mt-2">
-              Enter your child's unique AceTrack ID (e.g., ACE-123456) to view their progress.
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const studentCode = (e.currentTarget.elements.namedItem('studentCode') as HTMLInputElement).value;
-              const relationship = (e.currentTarget.elements.namedItem('relationship') as HTMLSelectElement).value;
+      <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <h2 className="text-xl font-bold text-blue-900">Loading Student Dashboard...</h2>
+      </div>
+    );
+  }
 
-              try {
-                const { parentAPI } = await import('../services/api');
-                const res = await parentAPI.linkStudent({ studentCode, relationship });
-                if (res.success) {
-                  import('sonner').then(({ toast }) => toast.success("Student linked successfully! Re-loading..."));
-                  setTimeout(() => window.location.reload(), 1500);
-                }
-              } catch (err: any) {
-                import('sonner').then(({ toast }) => toast.error(err.message || "Failed to link student"));
-              }
-            }} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-800">Student's AceTrack ID</label>
-                <input
-                  name="studentCode"
-                  type="text"
-                  required
-                  placeholder="ACE-XXXXXX"
-                  className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-800">Relationship</label>
-                <select
-                  name="relationship"
-                  className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Father">Father</option>
-                  <option value="Mother">Mother</option>
-                  <option value="Guardian">Guardian</option>
-                </select>
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors font-semibold shadow-sm"
-              >
-                Link Account
-              </button>
-            </form>
-          </CardContent>
+  // If no student is linked or profile couldn't load, show an error message since linking is ONLY during registration
+  if (!userProfile || errorMsg) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center p-6 text-center">
+        <Card className="max-w-md w-full border-red-200 bg-red-50 shadow-lg p-8">
+          <div className="flex flex-col items-center gap-4">
+            <AlertTriangle className="w-12 h-12 text-red-400" />
+            <h2 className="text-xl font-bold text-red-900">No Linked Student Found</h2>
+            <p className="text-red-700 text-sm">
+              {errorMsg || "Student accounts must be linked during parent registration. Please contact support if you need assistance."}
+            </p>
+          </div>
         </Card>
       </div>
     );
   }
 
   // Real data processing
-  const activePlan = studyPlan || { dailyPlans: {}, currentStreak: 0, longestStreak: 0 };
+  // Depending on how mapBackendPlanToFrontend structures it, it uses `days` array.
+  const activePlan = studyPlan || { days: [], currentStreak: 0, longestStreak: 0 };
 
-  // Calculate overall stats
-  const dailyPlansArray = Object.values(activePlan.dailyPlans || {});
+  // Calculate overall stats from days
+  const dailyPlansArray = activePlan.days || [];
   const totalDays = dailyPlansArray.length;
 
   const completedDays = dailyPlansArray.filter(
-    (day: any) => (day.completedHours || 0) >= (day.totalHours || 0) * 0.8
+    (day: any) => {
+      const dayTotal = day.sessions?.length || 0;
+      const dayCompleted = day.sessions?.filter((s: any) => s.completed || s.status === 'completed').length || 0;
+      return dayTotal > 0 && (dayCompleted / dayTotal) >= 0.8;
+    }
   ).length;
 
   const totalSessions = dailyPlansArray.reduce(
@@ -96,10 +119,8 @@ export const ParentDashboard: React.FC = () => {
 
   const completionRate = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
 
-  // Average burnout
-  const avgBurnout = totalDays > 0 ?
-    dailyPlansArray.reduce((sum: number, day: any) => sum + (day.burnoutLevel || 0), 0) /
-    totalDays : 0;
+  // Average burnout (if available, otherwise 0)
+  const avgBurnout = 0;
 
   // Recent performance (last 7 days up to today)
   const today = new Date();
@@ -111,11 +132,15 @@ export const ParentDashboard: React.FC = () => {
     .slice(0, 7)
     .reverse();
 
-  const performanceData = recentDays.map((day: any) => ({
-    date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    completion: day.totalHours > 0 ? (day.completedHours / day.totalHours) * 100 : 0,
-    burnout: day.burnoutLevel || 0,
-  }));
+  const performanceData = recentDays.map((day: any) => {
+    const dayTotal = day.sessions?.length || 0;
+    const dayCompleted = day.sessions?.filter((s: any) => s.completed || s.status === 'completed').length || 0;
+    return {
+      date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      completion: dayTotal > 0 ? (dayCompleted / dayTotal) * 100 : 0,
+      burnout: 0,
+    };
+  });
 
   // Subject Distribution Data (Pie Chart)
   const subjectStats: Record<string, number> = {};
@@ -135,269 +160,382 @@ export const ParentDashboard: React.FC = () => {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-  // Heatmap Data (Last 90 Days)
-  const heatmapData = [];
-  const todayDate = new Date();
-  for (let i = 89; i >= 0; i--) {
-    const d = new Date(todayDate);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
+  // Calculate average session duration
+  const totalStudyMinutes = Object.values(subjectStats).reduce((sum, val) => sum + val, 0);
+  const avgSessionMinutes = totalSessions > 0 ? Math.round(totalStudyMinutes / totalSessions) : 0;
 
-    // Find plan for this day
-    const dayPlan = dailyPlansArray.find((dp: any) => dp.date === dateStr);
-    const hours = dayPlan ? (dayPlan.completedHours || 0) : 0;
+  // --------------------------------------------------------------------------------
+  // NEW ANALYTICS: 2. Subject Weakness Radar (Using quiz history & completion)
+  // --------------------------------------------------------------------------------
+  const radarStats: Record<string, { totalScore: number, attempts: number, name: string }> = {};
+  quizHistory.forEach((attempt: any) => {
+    const subject = attempt.subject_name || 'General';
+    if (!radarStats[subject]) radarStats[subject] = { totalScore: 0, attempts: 0, name: subject };
 
-    let intensity = 0;
-    if (hours > 0) intensity = 1;
-    if (hours > 2) intensity = 2;
-    if (hours > 4) intensity = 3;
-    if (hours > 6) intensity = 4;
+    // Calculate percentage score for this attempt
+    if (attempt.total_questions > 0) {
+      radarStats[subject].totalScore += (attempt.correct_answers / attempt.total_questions) * 100;
+      radarStats[subject].attempts += 1;
+    }
+  });
 
-    heatmapData.push({ date: dateStr, intensity, hours });
+  // If no quiz history, fallback to showing session completion rates
+  let radarData = Object.keys(radarStats).map(subject => ({
+    subject,
+    accuracy: Math.round(radarStats[subject].totalScore / radarStats[subject].attempts),
+    fullMark: 100
+  }));
+
+  // Fallback to time data if no quiz data
+  if (radarData.length === 0) {
+    // Generate from completion
+    const fallbackStats: Record<string, { total: number, completed: number }> = {};
+    dailyPlansArray.forEach((day: any) => {
+      (day.sessions || []).forEach((session: any) => {
+        const subject = session.subjectName || 'Other';
+        if (!fallbackStats[subject]) fallbackStats[subject] = { total: 0, completed: 0 };
+        fallbackStats[subject].total++;
+        if (session.status === 'completed' || session.completed) {
+          fallbackStats[subject].completed++;
+        }
+      });
+    });
+
+    radarData = Object.keys(fallbackStats).map(subject => ({
+      subject,
+      accuracy: Math.round((fallbackStats[subject].completed / fallbackStats[subject].total) * 100) || 0,
+      fullMark: 100
+    }));
   }
 
-  const getIntensityColor = (intensity: number) => {
-    switch (intensity) {
-      case 0: return 'bg-gray-100';
-      case 1: return 'bg-green-200';
-      case 2: return 'bg-green-400';
-      case 3: return 'bg-green-600';
-      case 4: return 'bg-green-800';
-      default: return 'bg-gray-100';
-    }
-  };
+  // --------------------------------------------------------------------------------
+  // NEW ANALYTICS: 3. Time Planned vs Time Executed (Simple KPI)
+  // --------------------------------------------------------------------------------
+  let totalPlannedMinutes = 0;
+  let totalActualMinutes = 0;
+
+  recentDays.forEach((day: any) => {
+    (day.sessions || []).forEach((session: any) => {
+      totalPlannedMinutes += (session.duration || 0);
+      if (session.status === 'completed' || session.completed) {
+        totalActualMinutes += (session.duration || 0);
+      }
+    });
+  });
+
+  const plannedHours = Math.round(totalPlannedMinutes / 60 * 10) / 10;
+  const actualHours = Math.round(totalActualMinutes / 60 * 10) / 10;
+  const timeCompletionPct = plannedHours > 0 ? Math.min(100, Math.round((actualHours / plannedHours) * 100)) : 0;
+
+  // --------------------------------------------------------------------------------
+  // NEW ANALYTICS: 5. Exam Readiness Gauge (Simple SVG realization)
+  // --------------------------------------------------------------------------------
+  // Weighting: 60% completion rate + 40% quiz accuracy
+  const avgAccuracy = radarData.length > 0
+    ? radarData.reduce((sum, d) => sum + d.accuracy, 0) / radarData.length
+    : completionRate; // fallback
+
+  let readinessScore = Math.round((completionRate * 0.6) + (avgAccuracy * 0.4));
+  if (isNaN(readinessScore)) readinessScore = 0;
+
+  // Calculate stroke dasharray for the gauge (semi-circle)
+  const gaugeCircumference = Math.PI * 100; // r=100
+  const dashOffset = gaugeCircumference - (readinessScore / 100) * gaugeCircumference;
+
+  let gaugeColor = '#ef4444'; // Red < 40
+  if (readinessScore >= 40 && readinessScore < 75) gaugeColor = '#eab308'; // Yellow 40-75
+  if (readinessScore >= 75) gaugeColor = '#22c55e'; // Green > 75
+
+
 
   return (
-    <div className="space-y-6">
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Overall Progress</p>
-                <p className="text-3xl font-bold mt-1">{completionRate.toFixed(0)}%</p>
-              </div>
-              <Award className="w-10 h-10 text-blue-500" />
-            </div>
-            <Progress value={completionRate} className="mt-3" />
-          </CardContent>
-        </Card>
+    <div className="relative space-y-10 pb-12">
+      {/* Background Ambience */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      <div className="absolute bottom-1/2 left-0 w-[400px] h-[400px] bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-500/3 blur-[150px] rounded-full pointer-events-none -z-10" />
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Days Completed</p>
-                <p className="text-3xl font-bold mt-1">
-                  {completedDays}/{totalDays}
-                </p>
-              </div>
-              <TrendingUp className="w-10 h-10 text-green-500" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {totalDays > 0 ? ((completedDays / totalDays) * 100).toFixed(0) : 0}% of planned days
-            </p>
-          </CardContent>
-        </Card>
+      {/* guardian Eye - Hero Section */}
+      <div className="relative group">
+        <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-[40px] opacity-10 blur-2xl group-hover:opacity-20 transition duration-700"></div>
+        <div className="relative bg-white/70 backdrop-blur-3xl border-2 border-white/60 rounded-[38px] p-8 md:p-10 shadow-2xl overflow-hidden">
+          {/* Decorative Elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -mr-32 -mt-32"></div>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Current Streak</p>
-                <p className="text-3xl font-bold mt-1">{activePlan.currentStreak || 0}</p>
+          <div className="flex flex-col lg:flex-row gap-10 items-center relative z-10">
+            {/* The "Eye" - Progress Ring */}
+            <div className="relative w-56 h-56 flex-shrink-0">
+              {/* Outer Glow Ring */}
+              <div className="absolute inset-0 rounded-full border-4 border-slate-100/50"></div>
+              <svg className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="112" cy="112" r="100"
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="12"
+                  className="text-slate-100"
+                />
+                <circle
+                  cx="112" cy="112" r="100"
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="12"
+                  strokeDasharray={628}
+                  strokeDashoffset={628 - (628 * (completionRate / 100))}
+                  strokeLinecap="round"
+                  className={`transition-all duration-1000 ease-out ${completionRate >= 80 ? 'text-emerald-500' : completionRate >= 50 ? 'text-indigo-500' : 'text-blue-500'
+                    }`}
+                  style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-4xl font-black text-slate-900">{completionRate.toFixed(0)}%</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Goal Mastery</span>
               </div>
-              <TrendingUp className="w-10 h-10 text-purple-500" />
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Longest: {activePlan.longestStreak || 0} days
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Avg. Burnout</p>
-                <p className="text-3xl font-bold mt-1">{avgBurnout.toFixed(0)}%</p>
+            {/* Student Pulse Info */}
+            <div className="flex-1 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="bg-emerald-500 w-2 h-2 rounded-full animate-pulse"></div>
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Student Pulse: Active</span>
+                  </div>
+                  <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+                    {userProfile.name}<span className="text-indigo-600">.</span>
+                  </h1>
+                  <p className="text-slate-500 font-bold mt-1">Class {userProfile.class} • {userProfile.stream || 'Standard'}</p>
+                </div>
+                <div className="flex gap-2">
+                  <div className="bg-white/50 backdrop-blur px-4 py-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
+                    <Target className="w-4 h-4 text-indigo-500" />
+                    <span className="text-xs font-black text-slate-700">{completedSessions}/{totalSessions} <span className="text-slate-400 font-bold">Sessions</span></span>
+                  </div>
+                  <div className="bg-white/50 backdrop-blur px-4 py-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    <span className="text-xs font-black text-slate-700">{activePlan.currentStreak || 0} <span className="text-slate-400 font-bold">Streak</span></span>
+                  </div>
+                </div>
               </div>
-              {avgBurnout > 70 ? (
-                <AlertTriangle className="w-10 h-10 text-red-500" />
-              ) : (
-                <TrendingDown className="w-10 h-10 text-green-500" />
-              )}
+
+              {/* Weekly Momentum Mini Chart */}
+              <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Weekly Momentum</h4>
+                  <div className="flex items-center gap-1 text-emerald-600 font-bold text-xs">
+                    <TrendingUp className="w-3 h-3" />
+                    <span>+12% vs last week</span>
+                  </div>
+                </div>
+                <div className="h-20 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={performanceData}>
+                      <defs>
+                        <linearGradient id="colorPerf" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Area type="monotone" dataKey="completion" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorPerf)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
-            {avgBurnout > 70 && (
-              <p className="text-xs text-red-600 mt-2">High burnout level detected</p>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      {/* Visual Analytics Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Heatmap */}
-        <Card className="h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Subject Insights */}
+        <Card className="rounded-[32px] border-2 border-white/60 bg-white/80 backdrop-blur-2xl shadow-xl overflow-hidden">
           <CardHeader>
-            <CardTitle>Study Consistency (Last 90 Days)</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
+                  <LucidePieChart className="w-6 h-6 text-blue-500" />
+                </div>
+                <CardTitle className="text-lg font-black text-slate-800">Subject Distribution</CardTitle>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-1">
-              {heatmapData.map((day) => (
-                <div
-                  key={day.date}
-                  className={`w-3 h-3 rounded-sm ${getIntensityColor(day.intensity)}`}
-                  title={`${day.date}: ${day.hours.toFixed(1)} hours`}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-2 mt-4 text-xs text-gray-500 justify-end">
-              <span>Less</span>
-              <div className="flex gap-1">
-                <div className="w-3 h-3 bg-gray-100 rounded-sm"></div>
-                <div className="w-3 h-3 bg-green-200 rounded-sm"></div>
-                <div className="w-3 h-3 bg-green-400 rounded-sm"></div>
-                <div className="w-3 h-3 bg-green-600 rounded-sm"></div>
-                <div className="w-3 h-3 bg-green-800 rounded-sm"></div>
+            {pieData.length > 0 ? (
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData} cx="50%" cy="50%" innerRadius={70} outerRadius={90}
+                      fill="#8884d8" paddingAngle={8} dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
+                      formatter={(value: number) => `${(value / 60).toFixed(1)} hrs`}
+                    />
+                    <Legend verticalAlign="bottom" height={36} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <span>More</span>
-            </div>
+            ) : (
+              <div className="h-[300px] flex flex-col items-center justify-center text-slate-400">
+                <Activity className="w-12 h-12 mb-4 opacity-20" />
+                <p className="font-bold">No study activity yet</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Pie Chart */}
-        <Card className="h-full">
+        {/* Performance Trends */}
+        <Card className="rounded-[32px] border-2 border-white/60 bg-white/80 backdrop-blur-2xl shadow-xl overflow-hidden">
           <CardHeader>
-            <CardTitle>Subject Distribution (Actual Study Time)</CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => `${(value / 60).toFixed(1)} hrs`} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[250px] flex items-center justify-center text-gray-400">
-                No study data available yet
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                <Activity className="w-6 h-6 text-emerald-500" />
               </div>
-            )}
+              <CardTitle className="text-lg font-black text-slate-800">Performance Trends</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={performanceData}>
+                  <defs>
+                    <linearGradient id="colorComp" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
+                  <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} />
+                  <Area type="monotone" dataKey="completion" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorComp)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Performance Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Performance (Last 7 Days)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            {performanceData.length > 0 ? (
-              <LineChart data={performanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="completion"
-                  stroke="#10b981"
-                  name="Completion %"
-                  strokeWidth={2}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="burnout"
-                  stroke="#ef4444"
-                  name="Burnout %"
-                  strokeWidth={2}
-                />
-              </LineChart>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Time Management Tile */}
+        <Card className="lg:col-span-3 rounded-[32px] border-2 border-white/60 bg-white/80 backdrop-blur-2xl shadow-xl overflow-hidden flex flex-col justify-center p-8">
+          <div className="flex items-center gap-6 mb-8">
+            <div className="w-16 h-16 rounded-3xl bg-indigo-500 flex items-center justify-center shadow-xl shadow-indigo-200">
+              <Clock className="w-10 h-10 text-white" />
+            </div>
+            <div>
+              <h4 className="text-3xl font-black text-slate-900">{actualHours} hrs</h4>
+              <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Time Executed</p>
+            </div>
+          </div>
+          <div className="space-y-4 max-w-2xl">
+            <div className="flex justify-between items-end">
+              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Schedule Adherence</span>
+              <span className="text-2xl font-black text-indigo-600">{timeCompletionPct}%</span>
+            </div>
+            <div className="h-5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-1000"
+                style={{ width: `${timeCompletionPct}%` }}
+              />
+            </div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Targeted: {plannedHours} hrs this week</p>
+          </div>
+        </Card>
+      </div>
+
+      {/* Advanced Insights & History */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+              <Award className="w-6 h-6 text-indigo-500" />
+              Quiz Performance
+            </h3>
+            <button className="text-xs font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group">
+              Full History <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
+            </button>
+          </div>
+          <div className="bg-white/50 backdrop-blur-xl border-2 border-white/60 rounded-[32px] overflow-hidden shadow-xl">
+            {quizHistory.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {quizHistory.slice(0, 4).map((attempt: any, i) => (
+                  <div key={i} className="p-5 hover:bg-white transition-colors flex items-center justify-between group">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg transition-transform group-hover:scale-110 ${Number(attempt.correct_answers / attempt.total_questions) >= 0.8 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
+                        }`}>
+                        {attempt.subject_name ? attempt.subject_name.charAt(0) : 'Q'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-800">{attempt.quiz_title || 'General Quiz'}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(attempt.attempt_date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-black text-slate-900">{Math.round((attempt.correct_answers / attempt.total_questions) * 100)}%</p>
+                      <p className="text-[10px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">ACCURACY</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-gray-400">
-                No performance data available yet
+              <div className="p-12 text-center text-slate-400 font-bold">No quizzes attempted yet</div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+              <AlertTriangle className="w-6 h-6 text-rose-500" />
+              Focus Disruptions
+            </h3>
+          </div>
+          <div className="bg-white/50 backdrop-blur-xl border-2 border-white/60 rounded-[32px] overflow-hidden shadow-xl">
+            {skippedSessions.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {skippedSessions.slice(0, 4).map((session: any, i) => (
+                  <div key={i} className="p-5 flex items-center justify-between transition-colors hover:bg-white">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center">
+                        <TrendingDown className="w-6 h-6 text-rose-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-800">{session.topic_name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{session.subject_name} • {new Date(session.original_date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="px-3 py-1 rounded-full bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest">
+                      Skipped
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-12 text-center flex flex-col items-center gap-3">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                </div>
+                <p className="font-black text-emerald-600">Pure Focus! No skipped sessions.</p>
               </div>
             )}
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-medium text-blue-900">Student Profile</h4>
-            <div className="grid grid-cols-2 gap-3 mt-2 text-sm">
-              <div>
-                <span className="text-gray-600">Name:</span>
-                <span className="ml-2 font-medium">{userProfile.name}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Class:</span>
-                <span className="ml-2 font-medium">{userProfile.class}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Board:</span>
-                <span className="ml-2 font-medium">{userProfile.board?.toUpperCase()}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">ID:</span>
-                <span className="ml-2 font-medium text-blue-700">{userProfile.studentCode || 'N/A'}</span>
-              </div>
-            </div>
           </div>
+        </div>
+      </div>
 
-          <div className="p-4 bg-green-50 rounded-lg">
-            <h4 className="font-medium text-green-900">Achievements</h4>
-            <ul className="mt-2 space-y-1 text-sm">
-              <li className="flex items-center gap-2">
-                ✓ Completed {completedSessions} study sessions
-              </li>
-              <li className="flex items-center gap-2">
-                ✓ Maintained {activePlan.currentStreak || 0} day streak
-              </li>
-              <li className="flex items-center gap-2">
-                ✓ {completionRate.toFixed(0)}% overall completion rate
-              </li>
-            </ul>
-          </div>
+      <div className="space-y-6">
+        <h3 className="text-xl font-black text-slate-900 tracking-tight px-2">Learning Anatomy</h3>
+        <div className="bg-white/70 backdrop-blur-3xl border-2 border-white/60 rounded-[38px] p-8 shadow-2xl">
+          <PsychometricResults profile={userProfile} />
+        </div>
+      </div>
 
-          {avgBurnout > 70 && (
-            <div className="p-4 bg-red-50 rounded-lg">
-              <h4 className="font-medium text-red-900 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Recommendations
-              </h4>
-              <ul className="mt-2 space-y-1 text-sm text-red-800">
-                <li>• Consider reducing daily study hours</li>
-                <li>• Encourage more breaks and recreational activities</li>
-                <li>• Monitor stress levels closely</li>
-              </ul>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 };

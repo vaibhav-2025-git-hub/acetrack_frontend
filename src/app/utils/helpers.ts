@@ -5,7 +5,7 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null;
+  let timeout: any | null = null;
   return (...args: Parameters<T>) => {
     if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
@@ -238,3 +238,61 @@ export function smoothScrollTo(elementId: string): void {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
+
+
+// Map backend study plan to frontend format
+export const mapBackendPlanToFrontend = (backendPlan: any) => {
+  if (!backendPlan) return null;
+
+  const mappedDailyPlans: Record<string, any> = {};
+  const days: any[] = [];
+
+  if (backendPlan.daily_plans) {
+    backendPlan.daily_plans.forEach((dp: any) => {
+      const dateKey = toISODate(dp.date);
+      const mappedSessions = (dp.sessions || []).map((s: any) => ({
+        id: s.id?.toString() || Math.random().toString(),
+        topicId: s.topic_id || 'unassigned',
+        topicName: s.topic_name || 'Study Session',
+        chapterId: s.chapter_id || 'unassigned',
+        chapterName: s.chapter_name || 'General',
+        subjectId: s.subject_id || 'unassigned',
+        subjectName: s.subject_name || 'Subject',
+        date: dateKey,
+        startTime: s.start_time || '09:00',
+        duration: s.duration || 60,
+        status: s.status || (s.completed ? 'completed' : 'not-started'),
+        completed: s.completed || s.status === 'completed',
+        isRevision: s.is_revision || false,
+        completionPercentage: s.completion_percentage || 0,
+        notes: s.notes,
+        completedAt: s.completed_at,
+        is_rescheduled: s.is_rescheduled || false,
+        rescheduled_from_date: s.rescheduled_from_date
+      }));
+
+      mappedDailyPlans[dateKey] = {
+        date: dateKey,
+        sessions: mappedSessions,
+        totalHours: (dp.sessions || []).reduce((acc: number, s: any) => acc + (s.duration || 60), 0) / 60,
+        completedHours: (dp.sessions || []).filter((s: any) => s.status === 'completed' || s.completed).reduce((acc: number, s: any) => acc + (s.duration || 60), 0) / 60,
+        burnoutLevel: dp.burnout_level || 0
+      };
+
+      days.push({
+        date: dateKey,
+        sessions: mappedSessions
+      });
+    });
+  }
+
+  return {
+    dailyPlans: mappedDailyPlans,
+    days: days,
+    overallProgress: backendPlan.overall_progress || 0,
+    currentStreak: backendPlan.current_streak || 0,
+    longestStreak: backendPlan.longest_streak || 0,
+    subjectTracking: {},
+    parentAlerts: []
+  };
+};

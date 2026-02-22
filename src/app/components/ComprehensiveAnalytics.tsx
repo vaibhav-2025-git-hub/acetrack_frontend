@@ -457,6 +457,122 @@ export const ComprehensiveAnalytics: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <QuizPerformanceAnalytics />
+    </div>
+  );
+};
+
+// Internal component for Quiz Analytics
+const QuizPerformanceAnalytics: React.FC = () => {
+  const [history, setHistory] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const { quizzesAPI } = await import('../services/api');
+        const res = await quizzesAPI.getHistory();
+        if (res.success) {
+          setHistory(res.data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch quiz history", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  if (loading) return <div className="p-4 text-center">Loading Quiz Data...</div>;
+
+  return (
+    <div className="space-y-8">
+      {/* Quiz History Table */}
+      <div className="group relative">
+        <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 rounded-[32px] opacity-20 blur-xl group-hover:opacity-30 transition duration-500"></div>
+        <div className="relative rounded-[30px] bg-white/95 backdrop-blur-2xl shadow-2xl border-2 border-white/60 overflow-hidden">
+          <div className="border-b-2 bg-gradient-to-r from-amber-50/80 via-orange-50/80 to-red-50/80 px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center">
+                <Award className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Quiz History</h3>
+                <p className="text-xs text-slate-600">Your recent test performance</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            {history.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3">Quiz</th>
+                      <th className="px-4 py-3">Subject</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3 text-right">Score</th>
+                      <th className="px-4 py-3 text-right">Accuracy</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {history.map((attempt: any) => (
+                      <tr key={attempt.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-slate-800">{attempt.quiz_title}</td>
+                        <td className="px-4 py-3 text-slate-600">{attempt.subject_name}</td>
+                        <td className="px-4 py-3 text-slate-500">{new Date(attempt.attempt_date).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-right font-bold text-blue-600">{attempt.score.toFixed(0)}</td>
+                        <td className="px-4 py-3 text-right text-slate-600">
+                          {attempt.total_questions > 0 ? Math.round((attempt.correct_answers / attempt.total_questions) * 100) : 0}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-10 text-slate-500">
+                No quiz attempts yet. Take a quiz to see your history!
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Quiz Trend Chart */}
+      {history.length > 1 && (
+        <div className="group relative">
+          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 rounded-[32px] opacity-20 blur-xl group-hover:opacity-30 transition duration-500"></div>
+          <div className="relative rounded-[30px] bg-white/95 backdrop-blur-2xl shadow-2xl border-2 border-white/60 overflow-hidden">
+            <div className="border-b-2 bg-gradient-to-r from-cyan-50/80 via-blue-50/80 to-indigo-50/80 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">Score Trend</h3>
+                  <p className="text-xs text-slate-600">Performance over time</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6">
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={[...history].reverse()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="attempt_date" tickFormatter={(v) => new Date(v).getDate().toString()} tick={{ fontSize: 12 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

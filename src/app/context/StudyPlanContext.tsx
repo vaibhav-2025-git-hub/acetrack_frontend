@@ -1,21 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, StudyPlan, DailyPlan, ProgressData } from '../types';
-import { checkSubjectNeglect } from '../utils/subjectTracker';
 import { toast } from 'sonner';
+import { mapBackendPlanToFrontend } from '../utils/helpers';
 
-interface ScheduleChange {
-  id: string;
-  timestamp: string;
-  type: 'reschedule' | 'adaptation' | 'burnout' | 'completion' | 'difficulty_adjustment';
-  title: string;
-  description: string;
-  details?: {
-    from?: string;
-    to?: string;
-    subject?: string;
-    reason?: string;
-  };
-}
 
 interface StudyPlanContextType {
   userProfile: UserProfile | null;
@@ -27,22 +14,25 @@ interface StudyPlanContextType {
   updateProgress: (topicId: string, progress: Partial<ProgressData>) => void;
   isParentMode: boolean;
   setIsParentMode: (mode: boolean) => void;
-  checkAndUpdateSubjectTracking: () => void;
-  scheduleChanges: ScheduleChange[];
-  addScheduleChange: (change: Omit<ScheduleChange, 'id' | 'timestamp'>) => void;
   isAuthenticated: boolean;
   setIsAuthenticated: (auth: boolean) => void;
   userEmail: string | null;
   setUserEmail: (email: string | null) => void;
   loading: boolean;
   setLoading: (loading: boolean) => void;
+  refreshStudyPlan: () => Promise<void>;
+  scheduleChanges: any[];
+  setScheduleChanges: React.Dispatch<React.SetStateAction<any[]>>;
+  addScheduleChange: (change: any) => void;
 }
 
 const StudyPlanContext = createContext<StudyPlanContextType | undefined>(undefined);
 
 export const StudyPlanProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isAuthenticated') === 'true';
+  });
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
@@ -75,12 +65,31 @@ export const StudyPlanProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   });
 
-  const [scheduleChanges, setScheduleChanges] = useState<ScheduleChange[]>(() => {
-    const saved = localStorage.getItem('scheduleChanges');
-    return saved ? JSON.parse(saved) : [];
+  const [scheduleChanges, setScheduleChanges] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('scheduleChanges');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Error parsing scheduleChanges from localStorage", e);
+      return [];
+    }
   });
 
-  const [isParentMode, setIsParentMode] = useState(false);
+
+  const [isParentMode, setIsParentMode] = useState(() => {
+    return localStorage.getItem('isParentMode') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('isParentMode', isParentMode.toString());
+  }, [isParentMode]);
+
+  // Initial refresh from backend
+  useEffect(() => {
+    if (isAuthenticated && !isParentMode) {
+      refreshStudyPlan();
+    }
+  }, [isAuthenticated, isParentMode]);
 
   // Save user profile to localStorage when it changes
   useEffect(() => {
@@ -144,38 +153,17 @@ export const StudyPlanProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // Save schedule changes to localStorage
   useEffect(() => {
-    if (scheduleChanges.length > 0) {
-      localStorage.setItem('scheduleChanges', JSON.stringify(scheduleChanges));
-    }
+    localStorage.setItem('scheduleChanges', JSON.stringify(scheduleChanges));
   }, [scheduleChanges]);
 
-  const addScheduleChange = (change: Omit<ScheduleChange, 'id' | 'timestamp'>) => {
-    const newChange: ScheduleChange = {
-      ...change,
-      id: Date.now().toString(),
+  const addScheduleChange = (change: any) => {
+    const newChange = {
+      id: `change-${Date.now()}`,
       timestamp: new Date().toISOString(),
+      ...change
     };
-
-    setScheduleChanges((prev) => [...prev, newChange]);
-
-    // Show toast notification
-    const getToastIcon = (type: string) => {
-      switch (type) {
-        case 'reschedule': return '📅';
-        case 'adaptation': return '🔄';
-        case 'burnout': return '⚠️';
-        case 'completion': return '✅';
-        case 'difficulty_adjustment': return '⚙️';
-        default: return '📌';
-      }
-    };
-
-    toast.success(`${getToastIcon(change.type)} ${change.title}`, {
-      description: change.description,
-      duration: 5000,
-    });
+    setScheduleChanges((prev) => [newChange, ...prev]);
   };
-
   const updateProgress = (topicId: string, progress: Partial<ProgressData>) => {
     setProgressData((prev) => ({
       ...prev,
@@ -187,11 +175,19 @@ export const StudyPlanProvider: React.FC<{ children: ReactNode }> = ({ children 
     }));
   };
 
-  const checkAndUpdateSubjectTracking = () => {
-    if (studyPlan) {
-      const currentDate = new Date().toISOString().split('T')[0];
-      const updatedPlan = checkSubjectNeglect(studyPlan, currentDate);
-      setStudyPlan(updatedPlan);
+
+
+
+  const refreshStudyPlan = async () => {
+    try {
+      const { studyPlanAPI } = await import('../services/api');
+      const response = await studyPlanAPI.get();
+      if (response.success && response.data) {
+        const mappedPlan = mapBackendPlanToFrontend(response.data);
+        setStudyPlan(mappedPlan as any);
+      }
+    } catch (error) {
+      console.error("Failed to refresh study plan:", error);
     }
   };
 
@@ -207,15 +203,16 @@ export const StudyPlanProvider: React.FC<{ children: ReactNode }> = ({ children 
         updateProgress,
         isParentMode,
         setIsParentMode,
-        checkAndUpdateSubjectTracking,
-        scheduleChanges,
-        addScheduleChange,
         isAuthenticated,
         setIsAuthenticated,
         userEmail,
         setUserEmail,
         loading,
         setLoading,
+        refreshStudyPlan,
+        scheduleChanges,
+        setScheduleChanges,
+        addScheduleChange,
       }}
     >
       {children}

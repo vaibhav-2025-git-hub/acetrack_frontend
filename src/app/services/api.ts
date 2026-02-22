@@ -157,7 +157,7 @@ export const studyPlanAPI = {
     return { success: true };
   },
 
-  updateSession: async (sessionId: number | string, updates: { completed?: boolean; duration?: number }) => {
+  updateSession: async (sessionId: number | string, updates: { completed?: boolean; duration?: number; status?: 'skipped' | 'completed' | 'not-started' | 'in-progress'; notes?: string; time_remaining?: number; is_timer_active?: boolean }) => {
     return await apiRequest(`study-plan/session/${sessionId}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
@@ -219,6 +219,19 @@ export const flashcardsAPI = {
     });
   },
 
+  update: async (id: string, flashcardData: any) => {
+    return await apiRequest(`flashcards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(flashcardData),
+    });
+  },
+
+  delete: async (id: string) => {
+    return await apiRequest(`flashcards/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   review: async (flashcardId: number, correct: boolean) => {
     return await apiRequest(`flashcards/${flashcardId}/review`, {
       method: 'PUT',
@@ -233,6 +246,13 @@ export const flashcardsAPI = {
     // });
     console.warn('getDue not fully implemented in backend');
     return { success: true, data: [] };
+  },
+
+  publish: async (subjectId: string) => {
+    return await apiRequest('flashcards/publish', {
+      method: 'PUT',
+      body: JSON.stringify({ subjectId }),
+    });
   },
 };
 
@@ -283,6 +303,18 @@ export const quizzesAPI = {
       method: 'GET',
     });
   },
+
+  publish: async (quizId: string) => {
+    return await apiRequest(`quiz/${quizId}/publish`, {
+      method: 'PUT',
+    });
+  },
+
+  start: async (quizId: string) => {
+    return await apiRequest(`quiz/${quizId}/start`, {
+      method: 'GET',
+    });
+  },
 };
 
 // Parent API
@@ -297,6 +329,28 @@ export const parentAPI = {
     return await apiRequest('parent/link', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+};
+
+// Admin API
+export const adminAPI = {
+  getStats: async () => {
+    return await apiRequest('admin/stats', {
+      method: 'GET',
+    });
+  },
+
+  getUsers: async () => {
+    return await apiRequest('admin/users', {
+      method: 'GET',
+    });
+  },
+
+  toggleFeature: async (featureName: string, active: boolean) => {
+    return await apiRequest('admin/features', {
+      method: 'POST',
+      body: JSON.stringify({ feature: featureName, active }),
     });
   },
 };

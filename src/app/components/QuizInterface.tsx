@@ -18,6 +18,8 @@ interface QuizInterfaceProps {
   subjectName?: string;
   chapterName?: string;
   topicName?: string;
+  quizId?: string | null;
+  onComplete?: (score: number, timeSpent: number) => void;
 }
 
 export const QuizInterface: React.FC<QuizInterfaceProps> = ({
@@ -26,7 +28,9 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
   chapterId,
   subjectName,
   chapterName,
-  topicName
+  topicName,
+  quizId,
+  onComplete
 }) => {
   const { studyPlan, setStudyPlan, userProfile, addScheduleChange } = useStudyPlan();
   const [quizState, setQuizState] = useState<'setup' | 'in-progress' | 'completed'>('setup');
@@ -40,18 +44,62 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [questionCount, setQuestionCount] = useState(5);
   const [facultyQuizzes, setFacultyQuizzes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false); // Added loading state
+  const [quiz, setQuiz] = useState<any>(null); // Added quiz state for faculty quizzes
+  const [timeLeft, setTimeLeft] = useState<number | null>(null); // Added timeLeft state
 
   useEffect(() => {
-    const loadFacultyQuizzes = async () => {
-      try {
-        const res = await quizzesAPI.getAll();
-        if (res.success) setFacultyQuizzes(res.data);
-      } catch (e) {
-        console.error("Failed to load faculty quizzes");
-      }
-    };
-    loadFacultyQuizzes();
-  }, []);
+    if (quizId) { // Only fetch if quizId is provided
+      const fetchQuiz = async () => {
+        try {
+          setLoading(true);
+          // Use the new start endpoint to get randomized questions
+          const response = await quizzesAPI.start(quizId);
+
+          if (response.success) {
+            const fetchedQuiz = response.data;
+            setQuiz(fetchedQuiz);
+            const questions: QuizQuestion[] = fetchedQuiz.questions.map((q: any) => ({
+              id: q.id.toString(),
+              subjectId: fetchedQuiz.subject,
+              difficulty: q.difficulty,
+              question: q.question,
+              options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+              correctAnswer: q.correct_answer,
+              explanation: q.explanation
+            }));
+            setCurrentQuestions(questions);
+            setAnswers(new Array(questions.length).fill(-1));
+            setCurrentQuestionIndex(0);
+            setStartTime(new Date());
+            setQuizState('in-progress');
+            setTimeLeft(fetchedQuiz.time_limit ? fetchedQuiz.time_limit * 60 : 30 * 60); // Default 30 mins if not set
+          } else {
+            toast.error('Failed to load quiz');
+            onComplete?.(0, 0); // Exit
+          }
+        } catch (error) {
+          console.error('Error fetching quiz:', error);
+          toast.error('Error loading quiz');
+          onComplete?.(0, 0);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchQuiz();
+    } else { // Original logic for loading faculty quizzes if no specific quizId is provided
+      const loadFacultyQuizzes = async () => {
+        try {
+          const res = await quizzesAPI.getAll();
+          if (res.success) setFacultyQuizzes(res.data);
+        } catch (e) {
+          console.error("Failed to load faculty quizzes");
+        }
+      };
+      loadFacultyQuizzes();
+    }
+  }, [quizId, onComplete]); // Added quizId and onComplete to dependencies
 
   const startFacultyQuiz = (quiz: any) => {
     if (!quiz.questions || quiz.questions.length === 0) {

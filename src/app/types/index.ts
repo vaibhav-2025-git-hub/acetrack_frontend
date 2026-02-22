@@ -10,6 +10,19 @@ export interface ReferenceLink {
   platform?: string; // e.g., "YouTube", "Khan Academy", "NCERT"
 }
 
+export interface PsychometricDetails {
+  accuracy: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  avgTimePerQuestion: number;
+  categoryScores: {
+    numerical: number;
+    verbal: number;
+    logical: number;
+    spatial: number;
+  };
+}
+
 export interface UserProfile {
   name: string;
   class: string;
@@ -20,6 +33,7 @@ export interface UserProfile {
   learningSpeed: LearningSpeed;
   learningStyle: string;
   subjectDifficulties: Record<string, Difficulty>;
+  psychometricDetails?: PsychometricDetails;
   startDate: string;
   totalDays: number;
   studentCode?: string;
@@ -43,6 +57,11 @@ export interface StudySession {
   isRevision?: boolean;
   notes?: string;
   completedAt?: string; // timestamp when completed
+  is_rescheduled?: boolean;
+  rescheduled_from_date?: string;
+  time_remaining?: number;
+  is_timer_active?: boolean;
+  timer_last_updated?: string;
 }
 
 // REMOVED: Mood tracking types

@@ -9,6 +9,9 @@ import { PsychometricTest } from "./components/PsychometricTest";
 import { SubjectDifficulty } from "./components/SubjectDifficulty";
 import { StudyDashboard } from "./components/StudyDashboard";
 import { FacultyDashboard } from "./components/FacultyDashboard";
+import { LandingPage } from "./components/LandingPage";
+import { AdminLogin } from "./components/AdminLogin";
+import { AdminDashboard } from "./components/AdminDashboard";
 import { curriculumData } from "./data/curriculum";
 import { generateImprovedStudyPlan } from "./utils/improvedPlanGenerator";
 import { toISODate } from "./utils/helpers";
@@ -16,16 +19,20 @@ import {
   UserProfile,
   LearningSpeed,
   Difficulty,
+  PsychometricDetails,
 } from "./types";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 
 type Step =
+  | "landing"
   | "auth"
   | "profile"
   | "psychometric"
   | "difficulty"
-  | "dashboard";
+  | "dashboard"
+  | "admin-login"
+  | "admin-dashboard";
 
 console.log("App.tsx script executing");
 
@@ -58,68 +65,8 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-const mapBackendPlanToFrontend = (backendPlan: any) => {
-  if (!backendPlan) return null;
-
-  const mappedDailyPlans: Record<string, any> = {};
-  const days: any[] = [];
-
-  if (backendPlan.daily_plans) {
-    backendPlan.daily_plans.forEach((dp: any) => {
-      const dateKey = toISODate(dp.date);
-      const mappedSessions = (dp.sessions || []).map((s: any) => ({
-        id: s.id?.toString() || Math.random().toString(),
-        topicId: s.topic_id || 'unassigned',
-        topicName: s.topic_name || 'Study Session',
-        chapterId: s.chapter_id || 'unassigned',
-        chapterName: s.chapter_name || 'General',
-        subjectId: s.subject_id || 'unassigned',
-        subjectName: s.subject_name || 'Subject',
-        date: dateKey,
-        startTime: s.start_time || '09:00',
-        duration: s.duration || 60,
-        status: s.status || (s.completed ? 'completed' : 'not-started'),
-        completed: s.completed || s.status === 'completed',
-        isRevision: s.is_revision || false,
-        completionPercentage: s.completion_percentage || 0,
-        notes: s.notes,
-        completedAt: s.completed_at
-      }));
-
-      mappedDailyPlans[dateKey] = {
-        date: dateKey,
-        sessions: mappedSessions,
-        totalHours: (dp.sessions || []).reduce((acc: number, s: any) => acc + (s.duration || 60), 0) / 60,
-        completedHours: (dp.sessions || []).filter((s: any) => s.status === 'completed' || s.completed).reduce((acc: number, s: any) => acc + (s.duration || 60), 0) / 60,
-        burnoutLevel: dp.burnout_level || 0
-      };
-
-      days.push({
-        date: dateKey,
-        sessions: mappedSessions.map((s: any) => ({
-          id: s.id,
-          topicId: s.topicId,
-          topicName: s.topicName,
-          chapterId: s.chapterId,
-          chapterName: s.chapterName,
-          subjectId: s.subjectId,
-          duration: s.duration,
-          completed: s.completed
-        }))
-      });
-    });
-  }
-
-  return {
-    dailyPlans: mappedDailyPlans,
-    days: days,
-    overallProgress: backendPlan.overall_progress || 0,
-    currentStreak: backendPlan.current_streak || 0,
-    longestStreak: backendPlan.longest_streak || 0,
-    subjectTracking: {},
-    parentAlerts: []
-  };
-};
+// Local mapper removed in favor of shared helper
+import { mapBackendPlanToFrontend } from "./utils/helpers";
 
 const AppContent: React.FC = () => {
   console.log("AppContent rendering");
@@ -129,13 +76,14 @@ const AppContent: React.FC = () => {
     isAuthenticated, setIsAuthenticated,
     setIsParentMode
   } = useStudyPlan();
-  const [currentStep, setCurrentStep] = useState<Step>("auth");
+  const [currentStep, setCurrentStep] = useState<Step>("landing");
   const [tempProfile, setTempProfile] = useState<
     Partial<UserProfile>
   >({});
   const [userType, setUserType] = useState<
-    "student" | "parent" | "faculty"
+    "student" | "parent" | "faculty" | "platform_admin"
   >("student");
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
 
   // Check for saved authentication and profile on mount
   useEffect(() => {
@@ -166,61 +114,29 @@ const AppContent: React.FC = () => {
           console.error("Session verification error", e);
           localStorage.clear();
           setIsAuthenticated(false);
-          setCurrentStep("auth");
+          setCurrentStep("landing");
           return;
         }
 
         setIsAuthenticated(true);
-        const type = savedUserType as "student" | "parent" | "faculty";
+        const type = savedUserType as "student" | "parent" | "faculty" | "platform_admin";
         setUserType(type);
+        localStorage.setItem("isAuthenticated", "true"); // Ensure it's set if we restored
+        localStorage.setItem("userType", type);
 
         if (type === "parent") {
           setIsParentMode(true);
-          console.log("Restoring parent session... Always fetching fresh child data to stay synced.");
-          try {
-            const { parentAPI } = await import("./services/api");
-            const response = await parentAPI.getChildData();
-            if (response.success && response.data) {
-              const studentData = response.data;
-              console.log("Successfully fetched child data for parent:", studentData.profile?.name);
-
-              if (studentData.profile) {
-                setUserProfile(studentData.profile);
-                localStorage.setItem("userProfile", JSON.stringify(studentData.profile));
-              }
-              if (studentData.studyPlan) {
-                const mappedPlan = mapBackendPlanToFrontend(studentData.studyPlan);
-                setStudyPlan(mappedPlan as any);
-                localStorage.setItem("studyPlan", JSON.stringify(mappedPlan));
-              }
-              if (studentData.progress) {
-                const mappedProgress: Record<string, any> = {};
-                studentData.progress.forEach((p: any) => {
-                  mappedProgress[p.topic_id] = {
-                    topicId: p.topic_id,
-                    masteryLevel: parseFloat(p.mastery_level || 0),
-                    timeSpent: p.time_spent || 0,
-                    lastStudied: p.last_studied,
-                    notes: p.notes
-                  };
-                });
-                setProgressData(mappedProgress);
-                localStorage.setItem("progressData", JSON.stringify(mappedProgress));
-              }
-            } else {
-              console.warn("Parent is logged in but no child data found. Parent might not be linked yet.");
-            }
-          } catch (e) {
-            console.warn("Error fetching child data during session restoration", e);
-          }
+          // Simple restoration for parents
+          if (savedProfile) setUserProfile(JSON.parse(savedProfile));
+          if (savedPlan) setStudyPlan(JSON.parse(savedPlan));
           setCurrentStep("dashboard");
           return;
         }
 
         setIsParentMode(false);
-        if (type === "faculty") {
+        if (type === "faculty" || type === "platform_admin") {
           console.log(`Restoring ${type} session... skipping profile fetch.`);
-          setCurrentStep("dashboard");
+          setCurrentStep(type === "platform_admin" ? "admin-dashboard" : "dashboard");
           return;
         }
 
@@ -240,7 +156,8 @@ const AppContent: React.FC = () => {
               studyHoursPerDay: rawProfile.study_duration || rawProfile.studyHoursPerDay,
               totalDays: rawProfile.study_duration || rawProfile.totalDays,
               studentCode: rawProfile.student_code,
-              email: rawProfile.email
+              email: rawProfile.email,
+              psychometricDetails: rawProfile.psychometric_details || rawProfile.psychometricDetails
             };
             setUserProfile(profile);
             localStorage.setItem("userProfile", JSON.stringify(profile));
@@ -281,19 +198,19 @@ const AppContent: React.FC = () => {
               if (savedPlan) setStudyPlan(JSON.parse(savedPlan));
               setCurrentStep("dashboard");
             } else {
-              // If no profile at all, send to auth
-              console.log("No profile found and not a parent/faculty, redirecting to auth");
+              // If no profile at all, send to landing
+              console.log("No profile found and not a parent/faculty, redirecting to landing");
               setIsAuthenticated(false);
-              setCurrentStep("auth");
+              setCurrentStep("landing");
             }
           }
         } catch (e) {
           console.error("Critical error during session restoration", e);
         }
       } else {
-        // No saved auth, ensure we start at auth
+        // No saved auth, ensure we start at landing
         setIsAuthenticated(false);
-        setCurrentStep("auth");
+        setCurrentStep("landing");
       }
     };
 
@@ -301,15 +218,18 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handleLogin = async (
-    type: "student" | "parent" | "faculty",
+    type: "student" | "parent" | "faculty" | "platform_admin",
     userData: any,
   ) => {
     setIsAuthenticated(true);
     setUserType(type);
-
-    // Save authentication
     localStorage.setItem("isAuthenticated", "true");
     localStorage.setItem("userType", type);
+
+    // Save token immediately if present
+    if (userData?.token) {
+      localStorage.setItem("acetrack_token", userData.token);
+    }
 
     // Faculty goes directly to their dashboard
     if (type === "faculty") {
@@ -317,43 +237,15 @@ const AppContent: React.FC = () => {
       return;
     }
 
+    // Admin goes directly to admin dashboard
+    if (type === "platform_admin") {
+      setCurrentStep("admin-dashboard");
+      return;
+    }
+
     // Parent also goes to dashboard (parent view)
     if (type === "parent") {
       setIsParentMode(true);
-      try {
-        const { parentAPI } = await import("./services/api");
-        const response = await parentAPI.getChildData();
-        if (response.success && response.data) {
-          const studentData = response.data;
-          // Store child data in state/localStorage for ParentDashboard to consume
-          if (studentData.profile) {
-            setUserProfile(studentData.profile);
-            localStorage.setItem("userProfile", JSON.stringify(studentData.profile));
-          }
-          if (studentData.studyPlan) {
-            const mappedPlan = mapBackendPlanToFrontend(studentData.studyPlan);
-            setStudyPlan(mappedPlan as any);
-            localStorage.setItem("studyPlan", JSON.stringify(mappedPlan));
-          }
-          if (studentData.progress) {
-            const mappedProgress: Record<string, any> = {};
-            studentData.progress.forEach((p: any) => {
-              mappedProgress[p.topic_id] = {
-                topicId: p.topic_id,
-                masteryLevel: parseFloat(p.mastery_level || 0),
-                timeSpent: p.time_spent || 0,
-                lastStudied: p.last_studied,
-                notes: p.notes
-              };
-            });
-            setProgressData(mappedProgress);
-            localStorage.setItem("progressData", JSON.stringify(mappedProgress));
-          }
-          toast.success(`Linked to student: ${studentData.profile?.name || 'Your child'}`);
-        }
-      } catch (e) {
-        console.warn("Could not fetch child data for parent", e);
-      }
       setCurrentStep("dashboard");
       return;
     }
@@ -428,10 +320,23 @@ const AppContent: React.FC = () => {
               };
               await studyPlanAPI.create(planPayload);
               console.log("Generated plan successfully synced to backend");
+
+              // Fetch fresh plan with DB IDs
+              const freshPlanRes = await studyPlanAPI.get();
+              if (freshPlanRes.success && freshPlanRes.data) {
+                const mappedPlan = mapBackendPlanToFrontend(freshPlanRes.data);
+                if (mappedPlan) {
+                  setStudyPlan(mappedPlan as any);
+                  localStorage.setItem("studyPlan", JSON.stringify(mappedPlan));
+                }
+              }
             } catch (syncErr) {
               console.error("Failed to sync generated plan to backend", syncErr);
             }
           }
+
+          setIsParentMode(false); // Force student mode
+          localStorage.setItem('isParentMode', 'false');
 
           if (progRes.success && progRes.data) {
             const mappedProgress: Record<string, any> = {};
@@ -494,11 +399,13 @@ const AppContent: React.FC = () => {
   const handlePsychometricComplete = (
     learningSpeed: LearningSpeed,
     learningStyle: string,
+    psychometricDetails?: PsychometricDetails,
   ) => {
     setTempProfile((prev) => ({
       ...prev,
       learningSpeed,
       learningStyle,
+      psychometricDetails,
     }));
     setCurrentStep("difficulty");
   };
@@ -538,7 +445,8 @@ const AppContent: React.FC = () => {
         learning_style: completeProfile.learningStyle,
         study_duration: completeProfile.totalDays,
         selected_subjects: completeProfile.selectedSubjects,
-        subject_difficulties: completeProfile.subjectDifficulties
+        subject_difficulties: completeProfile.subjectDifficulties,
+        psychometric_details: completeProfile.psychometricDetails
       };
 
       await profileAPI.create(profilePayload);
@@ -616,13 +524,27 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 relative overflow-hidden">
       {/* Decorative Background Pattern */}
       <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        className="absolute inset-0 opacity-[0.06] pointer-events-none"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='800' height='800' viewBox='0 0 800 800' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 100c50-20 100-20 150 0s100 20 150 0 100-20 150 0 100 20 150 0 100-20 150 0M0 200c50-20 100-20 150 0s100 20 150 0 100-20 150 0 100 20 150 0 100-20 150 0M0 300c50-20 100-20 150 0s100 20 150 0 100-20 150 0 100 20 150 0 100-20 150 0M0 400c50-20 100-20 150 0s100 20 150 0 100-20 150 0 100 20 150 0 100-20 150 0M0 500c50-20 100-20 150 0s100 20 150 0 100-20 150 0 100 20 150 0 100-20 150 0M0 600c50-20 100-20 150 0s100 20 150 0 100-20 150 0 100 20 150 0 100-20 150 0' stroke='%236366f1' stroke-width='0.5' fill='none' opacity='0.5'/%3E%3Cpath d='M50 150c30 10 60 10 90 0s60-10 90 0 60 10 90 0 60-10 90 0 60 10 90 0 60-10 90 0M50 250c30 10 60 10 90 0s60-10 90 0 60 10 90 0 60-10 90 0 60 10 90 0 60-10 90 0M50 350c30 10 60 10 90 0s60-10 90 0 60 10 90 0 60-10 90 0 60 10 90 0 60-10 90 0M50 450c30 10 60 10 90 0s60-10 90 0 60 10 90 0 60-10 90 0 60 10 90 0 60-10 90 0M50 550c30 10 60 10 90 0s60-10 90 0 60 10 90 0 60-10 90 0 60 10 90 0 60-10 90 0' stroke='%238b5cf6' stroke-width='0.3' fill='none' opacity='0.3'/%3E%3C/svg%3E")`,
+          backgroundSize: '1200px 1200px',
         }}
       ></div>
+      {currentStep === "landing" && (
+        <LandingPage
+          onGetStarted={() => {
+            setAuthInitialMode('register');
+            setCurrentStep("auth");
+          }}
+          onLogin={() => {
+            setAuthInitialMode('login');
+            setCurrentStep("auth");
+          }}
+          onAdminLogin={() => setCurrentStep("admin-login")}
+        />
+      )}
       {currentStep === "auth" && (
-        <AuthPage onLogin={handleLogin} />
+        <AuthPage onLogin={handleLogin} initialMode={authInitialMode} />
       )}
       {currentStep === "profile" && (
         <ProfileSetup onComplete={handleProfileComplete} />
@@ -638,12 +560,39 @@ const AppContent: React.FC = () => {
           onComplete={handleDifficultyComplete}
         />
       )}
+      {currentStep === "admin-login" && (
+        <AdminLogin
+          onLogin={async (creds) => {
+            try {
+              const { authAPI } = await import("./services/api");
+              const res = await authAPI.login(creds);
+              if (res.success && res.data.is_admin) {
+                await handleLogin("platform_admin", res.data);
+              } else {
+                toast.error("Unauthorized. Admin privileges required.");
+              }
+            } catch (err) {
+              toast.error("Invalid admin credentials.");
+            }
+          }}
+          onBack={() => setCurrentStep("landing")}
+        />
+      )}
+      {currentStep === "admin-dashboard" && (
+        <AdminDashboard
+          onLogout={() => {
+            localStorage.clear();
+            setIsAuthenticated(false);
+            setCurrentStep("landing");
+          }}
+        />
+      )}
       {currentStep === "dashboard" &&
         (userType === "faculty" ? (
           <FacultyDashboard />
-        ) : (
-          <StudyDashboard userType={userType} />
-        ))}
+        ) : userType !== "platform_admin" ? (
+          <StudyDashboard userType={userType as "student" | "parent"} />
+        ) : null)}
       <Toaster />
     </div>
   );

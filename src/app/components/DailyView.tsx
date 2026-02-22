@@ -4,27 +4,189 @@ import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { useStudyPlan } from '../context/StudyPlanContext';
 import { StudyPlan } from '../types';
-import { ChevronLeft, ChevronRight, Check, X, Clock, Edit, Settings, ExternalLink, BookOpen, Video, FileText, PenTool, AlertTriangle, Shield, Keyboard } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, X, Clock, Edit, Settings, ExternalLink, BookOpen, Video, FileText, PenTool, AlertTriangle, Shield, Keyboard, CheckCircle2 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Badge } from './ui/badge';
 import { SessionCustomizationModal } from './SessionCustomizationModal';
 import { adaptPlanAfterSession, reorderSession, changeSessionSubject } from '../utils/improvedPlanGenerator';
 import { getReferenceLinks } from '../data/referenceLinks';
-import {
-  canSkipSubject,
-  updateSubjectTracking,
-  checkSubjectNeglect,
-  clearSubjectAlerts
-} from '../utils/subjectTracker';
-import {
-  checkAndTriggerRescheduling,
-  generateRescheduleSuggestions,
-  analyzeSkipPatterns
-} from '../utils/intelligentRescheduler';
 import { curriculumData } from '../data/curriculum';
 import { toast } from 'sonner';
 import { Tooltip } from './ui/tooltip';
 import { formatDate, isToday } from '../utils/helpers';
+
+// Session Timer Component
+const SessionTimer = ({ session, onComplete }: { session: any, onComplete: () => void }) => {
+  // Key for local storage to persist timer state locally
+  const storageKey = `timer_${session.id}`;
+
+  // Initialize from LocalStorage -> Backend -> Default
+  const [timeLeft, setTimeLeft] = useState(() => {
+    // 1. Try local storage (most recent local interaction)
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      const { left, timestamp, isActive } = JSON.parse(saved);
+      if (isActive) {
+        // Calculate elapsed time if it was running
+        const elapsed = Math.floor((Date.now() - timestamp) / 1000);
+        return Math.max(0, left - elapsed);
+      }
+      return left;
+    }
+
+    // 2. Try backend data
+    if (session.time_remaining !== undefined && session.time_remaining !== null) {
+      // If the timer was active on backend, we might need to adjust for time elapsed since last update
+      // But for simplicity, we'll trust the stored time or maybe start from there
+      // If we had a 'timer_last_updated' from backend, we could calculate accurate drift
+      if (session.is_timer_active && session.timer_last_updated) {
+        const lastUpdate = new Date(session.timer_last_updated).getTime();
+        const elapsed = Math.floor((Date.now() - lastUpdate) / 1000);
+        return Math.max(0, session.time_remaining - elapsed);
+      }
+      return session.time_remaining;
+    }
+
+    // 3. Default
+    return session.duration * 60;
+  });
+
+  const [isActive, setIsActive] = useState(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) return JSON.parse(saved).isActive;
+
+    return session.is_timer_active !== undefined ? Boolean(session.is_timer_active) : true;
+  });
+
+  // Timer Count Down
+  useEffect(() => {
+    let interval: any;
+    if (isActive && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev: number) => {
+          const newTime = prev - 1;
+          if (newTime <= 0) {
+            setIsActive(false);
+            return 0;
+          }
+          return newTime;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isActive, timeLeft]);
+
+  // Persist to Local Storage
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify({
+      left: timeLeft,
+      isActive,
+      timestamp: Date.now()
+    }));
+  }, [timeLeft, isActive, storageKey]);
+
+  // Sync to Backend (Periodic + Manual)
+  const syncToBackend = async (time: number, active: boolean) => {
+    try {
+      const { studyPlanAPI } = await import('../services/api');
+      await studyPlanAPI.updateSession(session.id, {
+        time_remaining: time,
+        is_timer_active: active
+      });
+    } catch (e) {
+      console.error("Failed to sync timer to backend", e);
+    }
+  };
+
+  // Periodic sync every 30s if active
+  useEffect(() => {
+    if (!isActive) return;
+
+    const syncInterval = setInterval(() => {
+      syncToBackend(timeLeft, isActive);
+    }, 30000);
+
+    return () => clearInterval(syncInterval);
+  }, [isActive, timeLeft]); // depend on timeLeft to capture current value in interval? No, closure.
+  // Actually, standard setInterval closure problem. Use a ref or just rely on re-render?
+  // Use a different pattern for interval to access latest state without resetting interval
+  // For simplicity, let's just sync on pause/resume mostly, and maybe simple interval with ref
+
+  const timeLeftRef = React.useRef(timeLeft);
+  useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const interval = setInterval(() => {
+      syncToBackend(timeLeftRef.current, true);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [isActive]);
+
+  const toggleTimer = () => {
+    const newState = !isActive;
+    setIsActive(newState);
+    // Immediate sync on toggle
+    syncToBackend(timeLeft, newState);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progress = ((session.duration * 60 - timeLeft) / (session.duration * 60)) * 100;
+
+  return (
+    <div className="mt-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-5xl font-['Outfit'] font-black text-slate-900 tracking-tight tabular-nums drop-shadow-sm">
+          {formatTime(timeLeft)}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={toggleTimer}
+            variant={isActive ? "outline" : "default"}
+            size="sm"
+            className={`rounded-full px-4 ${isActive ? 'border-amber-500 text-amber-600 hover:bg-amber-50' : 'bg-green-600 hover:bg-green-700'}`}
+          >
+            {isActive ? (
+              <>
+                <span className="mr-2">⏸</span> Pause
+              </>
+            ) : (
+              <>
+                <span className="mr-2">▶</span> Resume
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-indigo-500 transition-all duration-1000 ease-linear"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <Button
+        onClick={() => {
+          localStorage.removeItem(storageKey); // Clear timer state
+          // Also clear from backend? Maybe update to fully completed
+          onComplete();
+        }}
+        size="sm"
+        className="w-full group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-emerald-300/50 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-6 rounded-2xl"
+      >
+        <Check className="w-5 h-5 mr-2 relative z-10" />
+        <span className="relative z-10">Mark as Complete</span>
+      </Button>
+    </div>
+  );
+};
 
 interface DailyViewProps {
   currentDate: string;
@@ -40,7 +202,7 @@ interface DailyViewProps {
 }
 
 export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDate, onNavigateToQuiz }) => {
-  const { studyPlan, setStudyPlan, updateProgress, userProfile, addScheduleChange, isParentMode } = useStudyPlan();
+  const { studyPlan, setStudyPlan, updateProgress, isParentMode, refreshStudyPlan, userProfile } = useStudyPlan();
   const [customizeModalOpen, setCustomizeModalOpen] = useState(false);
   const [quizPromptOpen, setQuizPromptOpen] = useState(false);
   const [completedSessionForQuiz, setCompletedSessionForQuiz] = useState<any | null>(null);
@@ -92,30 +254,13 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
     setCurrentDate(date.toISOString().split('T')[0]);
   };
 
-  const updateSessionStatus = async (sessionId: string, status: 'completed' | 'skipped' | 'in-progress') => {
+  const updateSessionStatus = async (sessionId: string, status: 'completed' | 'skipped' | 'in-progress' | 'not-started') => {
     if (!dailyPlan) return;
 
     const session = dailyPlan.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
-    // Check if subject can be skipped
-    if (status === 'skipped') {
-      const skipCheck = canSkipSubject(studyPlan, session.subjectId, currentDate);
-
-      // Show warning if subject hasn't been studied for 2+ days
-      if (skipCheck.shouldAlert) {
-        toast.warning(
-          skipCheck.reason || `⚠️ This subject hasn't been studied recently. Parents have been notified.`,
-          {
-            duration: 6000,
-            icon: <AlertTriangle className="w-5 h-5 text-amber-500" />,
-          }
-        );
-        // Create parent alert
-        const updatedPlan = checkSubjectNeglect(studyPlan, currentDate);
-        setStudyPlan(updatedPlan);
-      }
-    }
+    // Simplified skip logic without tracking
 
     const updatedSessions = dailyPlan.sessions.map((s) =>
       s.id === sessionId
@@ -158,30 +303,17 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
       )
     };
 
-    // Update subject tracking
-    updatedPlan = updateSubjectTracking(updatedPlan, {
-      ...session,
-      status,
-      date: currentDate,
-    });
-
-    // Check for subject neglect and generate parent alerts
-    updatedPlan = checkSubjectNeglect(updatedPlan, currentDate);
-
-    // Clear alerts if subject was completed
-    if (status === 'completed') {
-      updatedPlan = clearSubjectAlerts(updatedPlan, session.subjectId);
-    }
-
     setStudyPlan(updatedPlan);
 
-    // Sync to backend if authenticated and it's a real session ID (number), and NOT in parent mode
-    if (!isParentMode && session && !isNaN(Number(session.id))) {
+    // Sync to backend if authenticated and it's a real session ID (numeric database ID), and NOT in parent mode
+    const isRealSessionId = session.id && !isNaN(Number(session.id));
+
+    if (!isParentMode && session && isRealSessionId) {
       try {
         const { studyPlanAPI } = await import('../services/api');
         await studyPlanAPI.updateSession(session.id, {
           completed: status === 'completed',
-          // Could also sync duration if it was changed
+          status: status
         });
       } catch (e) {
         console.warn("Failed to sync session status to server", e);
@@ -232,21 +364,8 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
     const updatedPlan = reorderSession(studyPlan, currentDate, fromIndex, toIndex);
     setStudyPlan(updatedPlan);
 
-    // Track the schedule change
-    const fromSession = dailyPlan.sessions[fromIndex];
-    const toSession = dailyPlan.sessions[toIndex];
-
-    addScheduleChange({
-      type: 'reschedule',
-      title: 'Session Order Changed',
-      description: `Reordered "${fromSession.subjectName}" session in your schedule`,
-      details: {
-        from: `Position ${fromIndex + 1}`,
-        to: `Position ${toIndex + 1}`,
-        subject: fromSession.subjectName,
-        reason: 'Manual rescheduling requested'
-      }
-    });
+    // Track the schedule change (Simplified)
+    console.log("Session order changed", { fromIndex, toIndex });
 
     toast.success('Session order updated!');
   };
@@ -261,17 +380,8 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
     // Find new subject name
     const newSubject = availableSubjects.find(s => s.id === newSubjectId);
 
-    // Track the schedule change
-    addScheduleChange({
-      type: 'adaptation',
-      title: 'Subject Changed',
-      description: `Changed session subject to better match your learning goals`,
-      details: {
-        from: oldSubjectName,
-        to: newSubject?.name || 'New Subject',
-        reason: 'Student preference'
-      }
-    });
+    // Track the schedule change (Simplified)
+    console.log("Subject changed", { oldSubjectName, newSubjectId });
 
     toast.success('Subject changed successfully!');
   };
@@ -303,18 +413,8 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
 
     setStudyPlan(updatedPlan);
 
-    // Track the schedule change
-    addScheduleChange({
-      type: 'adaptation',
-      title: 'Session Duration Adjusted',
-      description: `Modified "${session?.subjectName}" session duration`,
-      details: {
-        from: `${oldDuration} minutes`,
-        to: `${newDuration} minutes`,
-        subject: session?.subjectName,
-        reason: 'Duration customization'
-      }
-    });
+    // Track the schedule change (Simplified)
+    console.log("Duration changed", { sessionId, newDuration });
   };
 
   if (!dailyPlan) {
@@ -464,93 +564,124 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
             }
           };
 
-          const cardGradient = session.status === 'completed'
-            ? 'from-emerald-400 via-teal-500 to-green-500'
-            : session.status === 'in-progress'
-              ? 'from-blue-400 via-cyan-500 to-indigo-500'
-              : session.status === 'skipped'
-                ? 'from-slate-300 to-gray-400'
-                : 'from-indigo-400 via-purple-500 to-pink-500';
+          // Advanced Color Mapping By Subject
+          const subject = session.subjectName.toLowerCase();
+          let baseGradients = {
+            border: 'from-indigo-400 via-purple-500 to-pink-500',
+            bg: 'from-white via-indigo-50/30 to-purple-50/30',
+            icon: 'from-indigo-500 to-purple-600',
+            badge: 'from-blue-100 to-cyan-100 text-blue-700 border-blue-200/50',
+          };
 
-          const cardBg = session.status === 'completed'
-            ? 'from-emerald-50/95 via-teal-50/95 to-green-50/95'
-            : session.status === 'in-progress'
-              ? 'from-blue-50/95 via-cyan-50/95 to-indigo-50/95'
-              : session.status === 'skipped'
-                ? 'from-slate-50 to-gray-50'
-                : 'from-white via-indigo-50/30 to-purple-50/30';
+          if (subject.includes('phys')) {
+            baseGradients = { border: 'from-cyan-400 via-blue-500 to-indigo-500', bg: 'from-white via-cyan-50/30 to-blue-50/30', icon: 'from-cyan-500 to-blue-600', badge: 'from-cyan-100 to-blue-100 text-cyan-700 border-cyan-200/50' };
+          } else if (subject.includes('math')) {
+            baseGradients = { border: 'from-rose-400 via-orange-500 to-amber-500', bg: 'from-white via-rose-50/30 to-orange-50/30', icon: 'from-rose-500 to-orange-600', badge: 'from-rose-100 to-orange-100 text-rose-700 border-rose-200/50' };
+          } else if (subject.includes('chem')) {
+            baseGradients = { border: 'from-emerald-400 via-teal-500 to-cyan-500', bg: 'from-white via-emerald-50/30 to-teal-50/30', icon: 'from-emerald-500 to-teal-600', badge: 'from-emerald-100 to-teal-100 text-emerald-700 border-emerald-200/50' };
+          } else if (subject.includes('bio')) {
+            baseGradients = { border: 'from-lime-400 via-green-500 to-emerald-500', bg: 'from-white via-lime-50/30 to-green-50/30', icon: 'from-lime-500 to-green-600', badge: 'from-lime-100 to-green-100 text-lime-700 border-lime-200/50' };
+          }
+
+          const isCompleted = session.status === 'completed';
+          const isInProgress = session.status === 'in-progress';
+          const isSkipped = session.status === 'skipped';
+
+          const cardGradient = isCompleted ? 'from-emerald-400 via-teal-500 to-green-500'
+            : isInProgress ? 'from-amber-400 via-orange-500 to-pink-500'
+              : isSkipped ? 'from-slate-300 to-gray-400'
+                : baseGradients.border;
+
+          const cardBg = isCompleted ? 'from-emerald-50/95 via-teal-50/95 to-green-50/95'
+            : isInProgress ? 'from-amber-50/95 via-orange-50/95 to-pink-50/95'
+              : isSkipped ? 'from-slate-50 to-gray-50'
+                : baseGradients.bg;
+
+          const iconGradient = (isCompleted || isInProgress) ? 'from-white/20 to-transparent' : baseGradients.icon;
 
           return (
             <div
               key={session.id}
-              className="group relative"
+              className="group relative flex gap-6 mt-8"
             >
-              <div className={`absolute -inset-1 bg-gradient-to-r ${cardGradient} rounded-[28px] ${session.status === 'skipped' ? 'opacity-20' : 'opacity-75 group-hover:opacity-100'} blur-lg transition duration-500`}></div>
-              <div className={`relative overflow-hidden rounded-[26px] bg-gradient-to-br ${cardBg} backdrop-blur-xl p-7 shadow-2xl border-2 border-white/60 ${session.status !== 'skipped' && 'group-hover:scale-[1.02]'} transition-all duration-500`}>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/20 to-transparent rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tl from-black/5 to-transparent rounded-full -ml-12 -mb-12"></div>
+              {/* Timeline Node */}
+              <div className="flex flex-col items-center mt-6">
+                <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${cardGradient} shadow-lg ring-4 ring-white z-10`}></div>
+                {index !== dailyPlan.sessions.length - 1 && (
+                  <div className="w-0.5 h-full bg-slate-200 mt-2 rounded-full hidden sm:block"></div>
+                )}
+              </div>
 
-                <div className="relative flex items-start gap-5">
-                  <div className="flex-shrink-0">
-                    <div className="relative">
-                      <div className={`absolute -inset-1 bg-gradient-to-r ${cardGradient} rounded-[18px] opacity-50 blur`}></div>
-                      <div className={`relative w-16 h-16 rounded-[16px] bg-gradient-to-br ${cardGradient} flex items-center justify-center text-white font-black text-2xl shadow-2xl`}>
-                        {session.subjectName.charAt(0)}
+              {/* Session Core Content */}
+              <div className="flex-1">
+                <div className={`absolute -inset-1 bg-gradient-to-r ${cardGradient} rounded-[28px] ${session.status === 'skipped' ? 'opacity-20' : 'opacity-75 group-hover:opacity-100'} blur-lg transition duration-500`}></div>
+                <div className={`relative overflow-hidden rounded-[26px] bg-gradient-to-br ${cardBg} backdrop-blur-xl p-7 shadow-2xl border-2 border-white/60 ${session.status !== 'skipped' && 'group-hover:scale-[1.02]'} transition-all duration-500`}>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/20 to-transparent rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tl from-black/5 to-transparent rounded-full -ml-12 -mb-12"></div>
+
+                  <div className="relative flex items-start gap-5">
+                    <div className="flex-shrink-0">
+                      <div className="relative">
+                        <div className={`absolute -inset-1 bg-gradient-to-r ${cardGradient} rounded-[18px] opacity-50 blur`}></div>
+                        <div className={`relative w-16 h-16 rounded-[16px] bg-gradient-to-br ${iconGradient} flex items-center justify-center text-white font-black text-2xl shadow-2xl`}>
+                          {session.subjectName.charAt(0)}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <Badge className="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-2 border-blue-200/50 shadow-lg rounded-xl">
-                            <span className="mr-1.5">⏱️</span>{session.duration} min
-                          </Badge>
-                          {session.isRevision && (
-                            <Badge className="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-2 border-amber-200/50 shadow-lg rounded-xl">
-                              <span className="mr-1.5">🔄</span>Revision
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <Badge className="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-2 border-blue-200/50 shadow-lg rounded-xl">
+                              <span className="mr-1.5">⏱️</span>{session.duration} min
                             </Badge>
-                          )}
-                        </div>
-                        <h3 className="font-black text-xl text-slate-900 mb-1.5">{session.subjectName}</h3>
-                        {(() => {
-                          let displayTopicName = session.topicName;
-                          const isGeneric = !displayTopicName ||
-                            displayTopicName === 'Study Session' ||
-                            displayTopicName === 'Topic' ||
-                            displayTopicName === 'General' ||
-                            displayTopicName === 'Unassigned';
+                            {session.isRevision && (
+                              <Badge className="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-2 border-amber-200/50 shadow-lg rounded-xl">
+                                <span className="mr-1.5">🔄</span>Revision
+                              </Badge>
+                            )}
+                          </div>
+                          <h3 className="font-black text-xl text-slate-900 mb-1.5">{session.subjectName}</h3>
+                          {(() => {
+                            let displayTopicName = session.topicName;
+                            const isGeneric = !displayTopicName ||
+                              displayTopicName === 'Study Session' ||
+                              displayTopicName === 'Topic' ||
+                              displayTopicName === 'General' ||
+                              displayTopicName === 'Unassigned';
 
-                          if (isGeneric) {
-                            // If we have a topicId, try to find it
-                            if (session.topicId) {
-                              // 1. Try specific context lookup first (fast path)
-                              let foundTopic = null;
-                              if (userProfile?.board && userProfile?.class && userProfile?.stream) {
-                                const board = curriculumData.find(b => b.id === userProfile.board);
-                                const stream = board?.classes[userProfile.class]?.find(s => s.id === userProfile.stream);
-                                if (stream) {
-                                  // Search in stream
-                                  for (const sub of stream.subjects) {
-                                    for (const ch of sub.chapters) {
-                                      const t = ch.topics.find(top => top.id === session.topicId);
-                                      if (t) { foundTopic = t; break; }
+                            if (isGeneric) {
+                              // If we have a topicId, try to find it
+                              if (session.topicId) {
+                                // 1. Try specific context lookup first (fast path)
+                                let foundTopic = null;
+                                if (userProfile?.board && userProfile?.class && userProfile?.stream) {
+                                  const board = curriculumData.find(b => b.id === userProfile.board);
+                                  const stream = board?.classes[userProfile.class]?.find(s => s.id === userProfile.stream);
+                                  if (stream) {
+                                    // Search in stream
+                                    for (const sub of stream.subjects) {
+                                      for (const ch of sub.chapters) {
+                                        const t = ch.topics.find(top => top.id === session.topicId);
+                                        if (t) { foundTopic = t; break; }
+                                      }
+                                      if (foundTopic) break;
                                     }
-                                    if (foundTopic) break;
                                   }
                                 }
-                              }
 
-                              // 2. Brute force lookup (slow path) if context failed
-                              if (!foundTopic) {
-                                for (const board of curriculumData) {
-                                  for (const classKey in board.classes) {
-                                    for (const stream of board.classes[classKey]) {
-                                      for (const sub of stream.subjects) {
-                                        for (const ch of sub.chapters) {
-                                          const t = ch.topics.find(top => top.id === session.topicId);
-                                          if (t) { foundTopic = t; break; }
+                                // 2. Brute force lookup (slow path) if context failed
+                                if (!foundTopic) {
+                                  for (const board of curriculumData) {
+                                    for (const classKey in board.classes) {
+                                      for (const stream of board.classes[classKey]) {
+                                        for (const sub of stream.subjects) {
+                                          for (const ch of sub.chapters) {
+                                            const t = ch.topics.find(top => top.id === session.topicId);
+                                            if (t) { foundTopic = t; break; }
+                                          }
+                                          if (foundTopic) break;
                                         }
                                         if (foundTopic) break;
                                       }
@@ -558,134 +689,152 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
                                     }
                                     if (foundTopic) break;
                                   }
-                                  if (foundTopic) break;
                                 }
-                              }
 
-                              if (foundTopic) {
-                                displayTopicName = foundTopic.name;
-                              } else {
-                                // 3. Last resort: Format the ID
-                                if (session.topicId.startsWith('revision-')) {
-                                  displayTopicName = "Revision: " + session.subjectName;
+                                if (foundTopic) {
+                                  displayTopicName = foundTopic.name;
                                 } else {
-                                  // "physics-laws" -> "Physics Laws"
-                                  displayTopicName = session.topicId
-                                    .split('-')
-                                    .filter(p => p !== 'topic' && p.length > 0)
-                                    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
-                                    .join(' ');
+                                  // 3. Last resort: Format the ID
+                                  if (session.topicId.startsWith('revision-')) {
+                                    displayTopicName = "Revision: " + session.subjectName;
+                                  } else {
+                                    // "physics-laws" -> "Physics Laws"
+                                    displayTopicName = session.topicId
+                                      .split('-')
+                                      .filter(p => p !== 'topic' && p.length > 0)
+                                      .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+                                      .join(' ');
+                                  }
                                 }
+                              } else {
+                                // If NO topicId, use a sensible default based on subject
+                                displayTopicName = `${session.subjectName} Review`;
                               }
-                            } else {
-                              // If NO topicId, use a sensible default based on subject
-                              displayTopicName = `${session.subjectName} Review`;
                             }
-                          }
-                          return (
-                            <p className="text-sm text-slate-700 font-bold mb-1">{displayTopicName || 'General Session'}</p>
-                          );
-                        })()}
-                        <p className="text-xs text-slate-600 font-semibold">{session.chapterName}</p>
-                        {session.notes && (
-                          <p className="text-xs text-slate-600 mt-3 italic bg-white/50 px-3 py-2 rounded-xl border border-slate-200">
-                            💬 {session.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                            return (
+                              <p className="text-sm text-slate-700 font-bold mb-1">{displayTopicName || 'General Session'}</p>
+                            );
+                          })()}
+                          <p className="text-xs text-slate-600 font-semibold">{session.chapterName}</p>
+                          {session.completed && (
+                            <span className="ml-auto flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Done
+                            </span>
+                          )}
 
-                    {/* Action Buttons */}
-                    {session.status === 'not-started' && (
-                      <div className="flex gap-3 mt-5">
-                        <Button
-                          onClick={() => updateSessionStatus(session.id, 'in-progress')}
-                          size="sm"
-                          className="flex-1 group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-blue-300/50 bg-gradient-to-r from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 text-blue-700 font-bold py-5 rounded-2xl"
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                          <Clock className="w-5 h-5 mr-2 relative z-10" />
-                          <span className="relative z-10">Start Session</span>
-                        </Button>
-                        <Button
-                          onClick={() => updateSessionStatus(session.id, 'completed')}
-                          size="sm"
-                          className="flex-1 group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-emerald-300/50 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-5 rounded-2xl"
-                        >
-                          <Check className="w-5 h-5 mr-2 relative z-10" />
-                          <span className="relative z-10">Complete</span>
-                        </Button>
-                        <Button
-                          onClick={() => updateSessionStatus(session.id, 'skipped')}
-                          size="sm"
-                          className="group relative overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-slate-300/50 bg-gradient-to-r from-slate-50 to-gray-50 hover:from-slate-100 hover:to-gray-100 text-slate-700 font-bold px-5 py-5 rounded-2xl"
-                        >
-                          <X className="w-5 h-5 relative z-10" />
-                        </Button>
-                      </div>
-                    )}
+                          {/* Rescheduled Badge */}
 
-                    {session.status === 'in-progress' && (
-                      <div className="flex gap-3 mt-5">
-                        <Button
-                          onClick={() => updateSessionStatus(session.id, 'completed')}
-                          size="sm"
-                          className="flex-1 group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-emerald-300/50 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-6 rounded-2xl"
-                        >
-                          <Check className="w-5 h-5 mr-2 relative z-10" />
-                          <span className="relative z-10">Mark as Complete</span>
-                        </Button>
-                      </div>
-                    )}
-
-                    {session.status === 'completed' && (
-                      <div className="mt-5">
-                        <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm shadow-xl border-2 border-emerald-300/50">
-                          <span className="text-base">✓</span> Completed Successfully
+                          {session.notes && (
+                            <p className="text-xs text-slate-600 mt-3 italic bg-white/50 px-3 py-2 rounded-xl border border-slate-200">
+                              💬 {session.notes}
+                            </p>
+                          )}
                         </div>
                       </div>
-                    )}
 
-                    {/* Reference Links Section */}
-                    {referenceLinks && referenceLinks.length > 0 && (
-                      <Collapsible className="mt-5">
-                        <CollapsibleTrigger asChild>
-                          <Button className="w-full justify-between group/trigger relative overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-purple-300/50 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 text-purple-700 font-bold py-5 rounded-2xl">
-                            <div className="absolute inset-0 bg-gradient-to-r from-purple-400/20 to-pink-400/20 translate-x-full group-hover/trigger:translate-x-0 transition-transform duration-300"></div>
-                            <span className="flex items-center gap-2 relative z-10">
-                              <BookOpen className="w-5 h-5" />
-                              Study Resources ({referenceLinks.length})
-                            </span>
-                            <ChevronRight className="w-5 h-5 relative z-10 group-hover/trigger:translate-x-1 transition-transform" />
+                      {/* Action Buttons */}
+                      {session.status === 'not-started' && (
+                        <div className="flex gap-3 mt-5">
+                          <Button
+                            onClick={() => updateSessionStatus(session.id, 'in-progress')}
+                            size="sm"
+                            className="flex-1 group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-blue-300/50 bg-gradient-to-r from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 text-blue-700 font-bold py-5 rounded-2xl"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                            <Clock className="w-5 h-5 mr-2 relative z-10" />
+                            <span className="relative z-10">Start Session</span>
                           </Button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="mt-4">
-                          <div className="grid grid-cols-1 gap-3">
-                            {referenceLinks.map((link, idx) => (
-                              <a
-                                key={idx}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="group/link relative"
-                              >
-                                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-[18px] opacity-40 group-hover/link:opacity-70 blur transition duration-300"></div>
-                                <div className="relative flex items-center justify-between p-4 bg-gradient-to-r from-indigo-50/90 to-purple-50/90 backdrop-blur-xl rounded-[16px] border-2 border-white/60 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]">
-                                  <div className="flex items-center gap-4 flex-1">
-                                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0 shadow-xl">{getLinkIcon(link.type)}</div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-bold text-sm text-slate-900 mb-1">{link.title}</div>
-                                      <div className="text-xs text-slate-600 font-semibold">{link.type.charAt(0).toUpperCase() + link.type.slice(1)}</div>
-                                    </div>
-                                    <ExternalLink className="w-5 h-5 text-indigo-600 flex-shrink-0 group-hover/link:translate-x-1 group-hover/link:-translate-y-1 transition-transform" />
-                                  </div>
-                                </div>
-                              </a>
-                            ))}
+                          <Button
+                            onClick={() => updateSessionStatus(session.id, 'completed')}
+                            size="sm"
+                            className="flex-1 group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-emerald-300/50 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-5 rounded-2xl"
+                          >
+                            <Check className="w-5 h-5 mr-2 relative z-10" />
+                            <span className="relative z-10">Complete</span>
+                          </Button>
+                          <Button
+                            onClick={() => updateSessionStatus(session.id, 'skipped')}
+                            size="sm"
+                            className="group relative overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-slate-300/50 bg-gradient-to-r from-slate-50 to-gray-50 hover:from-slate-100 hover:to-gray-100 text-slate-700 font-bold px-5 py-5 rounded-2xl"
+                          >
+                            <X className="w-5 h-5 relative z-10" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {session.status === 'in-progress' && (
+                        <SessionTimer
+                          session={session}
+                          onComplete={() => updateSessionStatus(session.id, 'completed')}
+                        />
+                      )}
+
+                      {session.status === 'completed' && (
+                        <div className="mt-5">
+                          <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm shadow-xl border-2 border-emerald-300/50">
+                            <span className="text-base">✓</span> Completed Successfully
                           </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    )}
+                        </div>
+                      )}
+
+                      {session.status === 'skipped' && (
+                        <div className="mt-5 flex items-center justify-between p-4 bg-slate-100 rounded-2xl border-2 border-slate-200">
+                          <div className="flex items-center gap-2 text-slate-600 font-bold text-sm">
+                            <X className="w-4 h-4" /> Skipped
+                          </div>
+                          <Button
+                            onClick={() => updateSessionStatus(session.id, 'not-started')}
+                            size="sm"
+                            variant="ghost"
+                            className="text-indigo-600 hover:text-indigo-700 font-bold hover:bg-white/50"
+                          >
+                            Undo Skip
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Reference Links Section */}
+                      {referenceLinks && referenceLinks.length > 0 && (
+                        <Collapsible className="mt-5">
+                          <CollapsibleTrigger asChild>
+                            <Button className="w-full justify-between group/trigger relative overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-purple-300/50 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 text-purple-700 font-bold py-5 rounded-2xl">
+                              <div className="absolute inset-0 bg-gradient-to-r from-purple-400/20 to-pink-400/20 translate-x-full group-hover/trigger:translate-x-0 transition-transform duration-300"></div>
+                              <span className="flex items-center gap-2 relative z-10">
+                                <BookOpen className="w-5 h-5" />
+                                Study Resources ({referenceLinks.length})
+                              </span>
+                              <ChevronRight className="w-5 h-5 relative z-10 group-hover/trigger:translate-x-1 transition-transform" />
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-4">
+                            <div className="grid grid-cols-1 gap-3">
+                              {referenceLinks.map((link, idx) => (
+                                <a
+                                  key={idx}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="group/link relative"
+                                >
+                                  <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-[18px] opacity-40 group-hover/link:opacity-70 blur transition duration-300"></div>
+                                  <div className="relative flex items-center justify-between p-4 bg-gradient-to-r from-indigo-50/90 to-purple-50/90 backdrop-blur-xl rounded-[16px] border-2 border-white/60 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]">
+                                    <div className="flex items-center gap-4 flex-1">
+                                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0 shadow-xl">{getLinkIcon(link.type)}</div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-sm text-slate-900 mb-1">{link.title}</div>
+                                        <div className="text-xs text-slate-600 font-semibold">{link.type.charAt(0).toUpperCase() + link.type.slice(1)}</div>
+                                      </div>
+                                      <ExternalLink className="w-5 h-5 text-indigo-600 flex-shrink-0 group-hover/link:translate-x-1 group-hover/link:-translate-y-1 transition-transform" />
+                                    </div>
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -695,19 +844,21 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
       </div>
 
       {/* Burnout Warning */}
-      {dailyPlan.burnoutLevel > 60 && (
-        <Card className="p-4 bg-orange-50 border-orange-200">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">⚠️</span>
-            <div className="flex-1">
-              <h4 className="font-semibold text-orange-900">High Burnout Level Detected</h4>
-              <p className="text-sm text-orange-700 mt-1">
-                You seem stressed. Consider taking a break or reducing study hours for today.
-              </p>
+      {
+        dailyPlan.burnoutLevel > 60 && (
+          <Card className="p-4 bg-orange-50 border-orange-200">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div className="flex-1">
+                <h4 className="font-semibold text-orange-900">High Burnout Level Detected</h4>
+                <p className="text-sm text-orange-700 mt-1">
+                  You seem stressed. Consider taking a break or reducing study hours for today.
+                </p>
+              </div>
             </div>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )
+      }
 
       {/* Session Customization Modal */}
       <SessionCustomizationModal
@@ -722,149 +873,153 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
       />
 
       {/* Quiz Prompt Modal */}
-      {completedSessionForQuiz && (
-        <div
-          className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ${quizPromptOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-          onClick={() => {
-            setQuizPromptOpen(false);
-            setCompletedSessionForQuiz(null);
-          }}
-        >
+      {
+        completedSessionForQuiz && (
           <div
-            className={`bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all duration-300 ${quizPromptOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
+            className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ${quizPromptOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => {
+              setQuizPromptOpen(false);
+              setCompletedSessionForQuiz(null);
+            }}
           >
-            <div className="text-center mb-6">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-xl">
-                <span className="text-4xl">🎯</span>
+            <div
+              className={`bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all duration-300 ${quizPromptOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
+                }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-xl">
+                  <span className="text-4xl">🎯</span>
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 mb-2">
+                  Test Your Knowledge!
+                </h3>
+                <p className="text-slate-600 font-semibold">
+                  You've completed <span className="text-purple-600 font-bold">{completedSessionForQuiz.topicName}</span>
+                </p>
+                <p className="text-sm text-slate-500 mt-2 font-semibold">
+                  Would you like to take a quick quiz to reinforce what you've learned?
+                </p>
               </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">
-                Test Your Knowledge!
-              </h3>
-              <p className="text-slate-600 font-semibold">
-                You've completed <span className="text-purple-600 font-bold">{completedSessionForQuiz.topicName}</span>
-              </p>
-              <p className="text-sm text-slate-500 mt-2 font-semibold">
-                Would you like to take a quick quiz to reinforce what you've learned?
+
+              <div className="space-y-3">
+                <Button
+                  onClick={() => {
+                    setQuizPromptOpen(false);
+                    // Navigate to quiz with full session data
+                    if (onNavigateToQuiz) {
+                      onNavigateToQuiz({
+                        topicId: completedSessionForQuiz.topicId,
+                        subjectId: completedSessionForQuiz.subjectId,
+                        chapterId: completedSessionForQuiz.chapterId || completedSessionForQuiz.topicId,
+                        topicName: completedSessionForQuiz.topicName,
+                        subjectName: completedSessionForQuiz.subjectName,
+                        chapterName: completedSessionForQuiz.chapterName || ''
+                      });
+                    } else {
+                      window.location.hash = `#quiz-${completedSessionForQuiz.topicId}`;
+                      toast.success('Opening quiz interface...');
+                    }
+                    setCompletedSessionForQuiz(null);
+                  }}
+                  className="w-full group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-4 rounded-2xl text-lg"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+                  <span className="relative z-10">✓ Yes, Start Quiz!</span>
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    setQuizPromptOpen(false);
+                    toast.info('You can always take the quiz later from Study Tools!');
+                    setCompletedSessionForQuiz(null);
+                  }}
+                  variant="outline"
+                  className="w-full font-bold py-4 rounded-2xl text-slate-700 border-2 border-slate-300 hover:bg-slate-50"
+                >
+                  Maybe Later
+                </Button>
+              </div>
+
+              <p className="text-xs text-slate-400 text-center mt-4 font-semibold">
+                💡 Taking quizzes helps solidify your understanding!
               </p>
             </div>
-
-            <div className="space-y-3">
-              <Button
-                onClick={() => {
-                  setQuizPromptOpen(false);
-                  // Navigate to quiz with full session data
-                  if (onNavigateToQuiz) {
-                    onNavigateToQuiz({
-                      topicId: completedSessionForQuiz.topicId,
-                      subjectId: completedSessionForQuiz.subjectId,
-                      chapterId: completedSessionForQuiz.chapterId || completedSessionForQuiz.topicId,
-                      topicName: completedSessionForQuiz.topicName,
-                      subjectName: completedSessionForQuiz.subjectName,
-                      chapterName: completedSessionForQuiz.chapterName || ''
-                    });
-                  } else {
-                    window.location.hash = `#quiz-${completedSessionForQuiz.topicId}`;
-                    toast.success('Opening quiz interface...');
-                  }
-                  setCompletedSessionForQuiz(null);
-                }}
-                className="w-full group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-4 rounded-2xl text-lg"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
-                <span className="relative z-10">✓ Yes, Start Quiz!</span>
-              </Button>
-
-              <Button
-                onClick={() => {
-                  setQuizPromptOpen(false);
-                  toast.info('You can always take the quiz later from Study Tools!');
-                  setCompletedSessionForQuiz(null);
-                }}
-                variant="outline"
-                className="w-full font-bold py-4 rounded-2xl text-slate-700 border-2 border-slate-300 hover:bg-slate-50"
-              >
-                Maybe Later
-              </Button>
-            </div>
-
-            <p className="text-xs text-slate-400 text-center mt-4 font-semibold">
-              💡 Taking quizzes helps solidify your understanding!
-            </p>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Keyboard Shortcuts Tooltip */}
-      {showKeyboardShortcuts && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
-          onClick={() => setShowKeyboardShortcuts(false)}
-        >
+      {
+        showKeyboardShortcuts && (
           <div
-            className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform animate-in zoom-in duration-200"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
+            onClick={() => setShowKeyboardShortcuts(false)}
           >
-            <div className="text-center mb-6">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-gray-500 to-slate-600 flex items-center justify-center shadow-xl">
-                <Keyboard className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">
-                Keyboard Shortcuts
-              </h3>
-              <p className="text-slate-600 font-semibold text-sm">
-                Navigate faster with these shortcuts
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <span className="text-sm font-bold text-slate-700">Previous Day</span>
-                <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
-                  ← Left Arrow
-                </kbd>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <span className="text-sm font-bold text-slate-700">Next Day</span>
-                <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
-                  → Right Arrow
-                </kbd>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <span className="text-sm font-bold text-slate-700">Jump to Today</span>
-                <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
-                  T
-                </kbd>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <span className="text-sm font-bold text-slate-700">Show Shortcuts</span>
-                <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
-                  ?
-                </kbd>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <span className="text-sm font-bold text-slate-700">Close Modals</span>
-                <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
-                  Esc
-                </kbd>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => setShowKeyboardShortcuts(false)}
-              className="w-full mt-6 font-bold py-3 rounded-2xl"
+            <div
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform animate-in zoom-in duration-200"
+              onClick={(e) => e.stopPropagation()}
             >
-              Got it!
-            </Button>
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-gray-500 to-slate-600 flex items-center justify-center shadow-xl">
+                  <Keyboard className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 mb-2">
+                  Keyboard Shortcuts
+                </h3>
+                <p className="text-slate-600 font-semibold text-sm">
+                  Navigate faster with these shortcuts
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <span className="text-sm font-bold text-slate-700">Previous Day</span>
+                  <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
+                    ← Left Arrow
+                  </kbd>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <span className="text-sm font-bold text-slate-700">Next Day</span>
+                  <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
+                    → Right Arrow
+                  </kbd>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <span className="text-sm font-bold text-slate-700">Jump to Today</span>
+                  <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
+                    T
+                  </kbd>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <span className="text-sm font-bold text-slate-700">Show Shortcuts</span>
+                  <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
+                    ?
+                  </kbd>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <span className="text-sm font-bold text-slate-700">Close Modals</span>
+                  <kbd className="px-3 py-1.5 bg-white border-2 border-gray-300 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
+                    Esc
+                  </kbd>
+                </div>
+              </div>
+
+              <Button
+                onClick={() => setShowKeyboardShortcuts(false)}
+                className="w-full mt-6 font-bold py-3 rounded-2xl"
+              >
+                Got it!
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
     </div>
   );
 };

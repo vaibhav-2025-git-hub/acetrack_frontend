@@ -12,6 +12,7 @@ import { FlashcardStudy } from './FlashcardStudy';
 import { QuizInterface } from './QuizInterface';
 import { ComprehensiveAnalytics } from './ComprehensiveAnalytics';
 import { ParentDashboard } from './ParentDashboard';
+import { PsychometricResults } from './PsychometricResults';
 import { exportToPDF } from '../utils/pdfExport';
 import { toast } from 'sonner';
 import {
@@ -28,10 +29,14 @@ import {
   PieChart,
   BarChart3,
   Activity,
-  Bell
+  Bell,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 import { notificationAPI } from '../services/api';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+
+import { StudySession } from '../types';
 
 interface StudyDashboardProps {
   userType: 'student' | 'parent';
@@ -42,6 +47,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
   const { userProfile, studyPlan } = useStudyPlan();
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeView, setActiveView] = useState<'schedule' | 'study-tools' | 'analytics'>('schedule');
+  const [scheduleTab, setScheduleTab] = useState('daily');
   const [studyToolsTab, setStudyToolsTab] = useState<'flashcards' | 'quizzes'>('flashcards');
   const [selectedQuizData, setSelectedQuizData] = useState<{
     topicId: string;
@@ -584,29 +590,132 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                     </div>
                   </div>
                   <div className="p-8">
-                    <Tabs defaultValue="daily">
-                      <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-indigo-100/80 via-purple-100/80 to-pink-100/80 p-2 rounded-2xl border-2 border-white/50 shadow-xl mb-8">
-                        <TabsTrigger
-                          value="daily"
-                          className="flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-indigo-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105"
-                        >
-                          <Calendar className="w-4 h-4" />
-                          <span>Daily</span>
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="weekly"
-                          className="flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-purple-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105"
-                        >
-                          <CalendarDays className="w-4 h-4" />
-                          <span>Weekly</span>
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="monthly"
-                          className="flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-pink-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105"
-                        >
-                          <CalendarRange className="w-4 h-4" />
-                          <span>Monthly</span>
-                        </TabsTrigger>
+
+                    {/* "Up Next" Hero Action Card */}
+                    {(() => {
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      const todayPlan = studyPlan.days?.find(d => d.date === todayStr);
+                      const nextSession = todayPlan?.sessions.find(s => !s.completed && s.status !== 'skipped');
+
+                      if (!nextSession) return null;
+
+                      // Derive a beautiful gradient based on the subject for the hero card
+                      const subject = nextSession.subjectName.toLowerCase();
+                      let gradient = 'from-indigo-500 via-purple-600 to-indigo-700';
+                      let shadowColor = 'rgba(99,102,241,0.5)';
+
+                      if (subject.includes('phys')) {
+                        gradient = 'from-cyan-500 via-blue-600 to-indigo-600'; shadowColor = 'rgba(6,182,212,0.5)';
+                      } else if (subject.includes('math')) {
+                        gradient = 'from-rose-500 via-orange-600 to-amber-600'; shadowColor = 'rgba(244,63,94,0.5)';
+                      } else if (subject.includes('chem')) {
+                        gradient = 'from-emerald-500 via-teal-600 to-cyan-600'; shadowColor = 'rgba(16,185,129,0.5)';
+                      } else if (subject.includes('bio')) {
+                        gradient = 'from-lime-500 via-green-600 to-emerald-600'; shadowColor = 'rgba(132,204,22,0.5)';
+                      }
+
+                      return (
+                        <div className="mb-10 group relative">
+                          <div className={`absolute -inset-1 bg-gradient-to-r ${gradient} rounded-[28px] opacity-60 group-hover:opacity-100 blur-xl transition duration-500 animate-pulse`}></div>
+                          <div className={`relative overflow-hidden rounded-[26px] bg-gradient-to-br ${gradient} p-8 shadow-2xl border-2 border-white/20 transform transition-all duration-300 group-hover:scale-[1.02]`}>
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                              <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Zap className="w-5 h-5 text-yellow-300 animate-bounce" />
+                                  <span className="text-white/90 font-black text-sm tracking-widest uppercase">Up Next</span>
+                                </div>
+                                <h3 className="text-3xl font-black text-white mb-2 tracking-tight drop-shadow-md">{nextSession.subjectName}</h3>
+                                <p className="text-white/80 font-bold text-lg">{nextSession.chapterName || 'General Review'}</p>
+
+                                <div className="flex items-center gap-4 mt-6">
+                                  <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl text-white font-bold text-sm">
+                                    <Clock className="w-4 h-4" /> {nextSession.duration} min
+                                  </div>
+                                  <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl text-white font-bold text-sm">
+                                    <Target className="w-4 h-4" /> Focus Session
+                                  </div>
+                                </div>
+                              </div>
+
+
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* The Interactive Horizontal Timeline */}
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-bold text-slate-700">Timeline</h3>
+                        <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200/50">
+                          {['daily', 'weekly', 'monthly'].map((mode) => (
+                            <button
+                              key={mode}
+                              onClick={() => setScheduleTab(mode)}
+                              className={`px-4 py-1.5 text-xs font-bold capitalize rounded-lg transition-all ${scheduleTab === mode
+                                ? 'bg-white shadow-md text-indigo-600'
+                                : 'text-slate-600 hover:text-slate-900'
+                                } outline-none`}
+                            >
+                              {mode}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Horizontal Date Scroller */}
+                      <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                        {Array.from({ length: 14 }).map((_, i) => {
+                          const d = new Date();
+                          d.setDate(d.getDate() - 3 + i); // Show 3 days past, 10 days future
+                          const ISODate = d.toISOString().split('T')[0];
+                          const isSelected = ISODate === currentDate;
+                          const isToday = ISODate === new Date().toISOString().split('T')[0];
+                          const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
+                          const dateNum = d.getDate();
+
+                          // Check completed status
+                          const dailyPlan = studyPlan.days?.find(day => day.date === ISODate);
+                          const hasPending = dailyPlan && dailyPlan.sessions.some(s => !s.completed);
+                          const isAllDone = dailyPlan && dailyPlan.sessions.length > 0 && dailyPlan.sessions.every(s => s.completed);
+
+                          return (
+                            <button
+                              key={ISODate}
+                              onClick={() => setCurrentDate(ISODate)}
+                              className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-[18px] transition-all duration-300 relative border-2 ${isSelected
+                                ? 'bg-gradient-to-br from-indigo-500 to-purple-600 border-indigo-400 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)] scale-110 z-10'
+                                : isToday
+                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:scale-105'
+                                  : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300 hover:shadow-md hover:scale-105'
+                                }`}
+                            >
+                              {/* Status Indicators */}
+                              {isAllDone && !isSelected && (
+                                <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
+                              )}
+                              {hasPending && !isSelected && (
+                                <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] animate-pulse"></div>
+                              )}
+
+                              <span className={`text-[10px] uppercase font-bold mb-1 opacity-80 ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>{dayOfWeek}</span>
+                              <span className={`text-xl font-black leading-none ${isSelected ? 'text-white' : 'text-slate-800'}`}>{dateNum}</span>
+
+                              {isToday && !isSelected && <span className="absolute -bottom-2.5 text-[8px] font-black tracking-widest text-indigo-500 uppercase">Today</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <Tabs value={scheduleTab} onValueChange={setScheduleTab} className="w-full">
+                      <TabsList className="hidden">
+                        <TabsTrigger value="daily">daily</TabsTrigger>
+                        <TabsTrigger value="weekly">weekly</TabsTrigger>
+                        <TabsTrigger value="monthly">monthly</TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="daily">
@@ -764,81 +873,87 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                         </>
                       );
                     })()}
-                  </div>
+                  </div >
                 </div>
               </div>
             </div>
           </div>
-        )}
+        )
+        }
 
         {/* Study Tools View */}
-        {activeView === 'study-tools' && (
-          <div className="space-y-8">
-            <div className="group relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 via-cyan-500 to-teal-500 rounded-[32px] opacity-20 blur-xl group-hover:opacity-30 transition duration-500"></div>
-              <div className="relative rounded-[30px] bg-white/95 backdrop-blur-2xl shadow-2xl border-2 border-white/60 overflow-hidden">
-                <div className="border-b-2 border-gradient-to-r from-blue-100 via-cyan-100 to-teal-100 bg-gradient-to-r from-blue-50/80 via-cyan-50/80 to-teal-50/80 backdrop-blur px-8 py-6">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <div className="absolute -inset-2 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-2xl opacity-50 blur"></div>
-                      <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 via-cyan-500 to-teal-500 flex items-center justify-center shadow-2xl">
-                        <span className="text-3xl">🧠</span>
+        {
+          activeView === 'study-tools' && (
+            <div className="space-y-8">
+              <div className="group relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 via-cyan-500 to-teal-500 rounded-[32px] opacity-20 blur-xl group-hover:opacity-30 transition duration-500"></div>
+                <div className="relative rounded-[30px] bg-white/95 backdrop-blur-2xl shadow-2xl border-2 border-white/60 overflow-hidden">
+                  <div className="border-b-2 border-gradient-to-r from-blue-100 via-cyan-100 to-teal-100 bg-gradient-to-r from-blue-50/80 via-cyan-50/80 to-teal-50/80 backdrop-blur px-8 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <div className="absolute -inset-2 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-2xl opacity-50 blur"></div>
+                        <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 via-cyan-500 to-teal-500 flex items-center justify-center shadow-2xl">
+                          <span className="text-3xl">🧠</span>
+                        </div>
+                      </div>
+                      <div>
+                        <h2 className="font-black text-slate-900 text-xl tracking-tight">Study Tools</h2>
+                        <p className="text-sm text-slate-600 mt-1 font-semibold">Flashcards, Quizzes & More</p>
                       </div>
                     </div>
-                    <div>
-                      <h2 className="font-black text-slate-900 text-xl tracking-tight">Study Tools</h2>
-                      <p className="text-sm text-slate-600 mt-1 font-semibold">Flashcards, Quizzes & More</p>
-                    </div>
                   </div>
-                </div>
-                <div className="p-8">
-                  <Tabs value={studyToolsTab} onValueChange={(val) => setStudyToolsTab(val as "flashcards" | "quizzes")}>
-                    <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-blue-100/80 to-cyan-100/80 p-2 rounded-2xl border-2 border-white/50 shadow-xl">
-                      <TabsTrigger value="flashcards" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-cyan-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105">
-                        <span className="mr-2 text-base">📚</span> Flashcards
-                      </TabsTrigger>
-                      <TabsTrigger value="quizzes" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-cyan-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105">
-                        <span className="mr-2 text-base">🎯</span> Quizzes
-                      </TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="flashcards" className="mt-8">
-                      <FlashcardStudy />
-                    </TabsContent>
-                    <TabsContent value="quizzes" className="mt-8">
-                      <QuizInterface
-                        topicId={selectedQuizData?.topicId}
-                        subjectId={selectedQuizData?.subjectId}
-                        chapterId={selectedQuizData?.chapterId}
-                        subjectName={selectedQuizData?.subjectName}
-                        chapterName={selectedQuizData?.chapterName}
-                        topicName={selectedQuizData?.topicName}
-                      />
-                    </TabsContent>
-                  </Tabs>
+                  <div className="p-8">
+                    <Tabs value={studyToolsTab} onValueChange={(val) => setStudyToolsTab(val as "flashcards" | "quizzes")}>
+                      <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-blue-100/80 to-cyan-100/80 p-2 rounded-2xl border-2 border-white/50 shadow-xl">
+                        <TabsTrigger value="flashcards" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-cyan-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105">
+                          <span className="mr-2 text-base">📚</span> Flashcards
+                        </TabsTrigger>
+                        <TabsTrigger value="quizzes" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-cyan-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105">
+                          <span className="mr-2 text-base">🎯</span> Quizzes
+                        </TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="flashcards" className="mt-8">
+                        <FlashcardStudy />
+                      </TabsContent>
+                      <TabsContent value="quizzes" className="mt-8">
+                        <QuizInterface
+                          topicId={selectedQuizData?.topicId}
+                          subjectId={selectedQuizData?.subjectId}
+                          chapterId={selectedQuizData?.chapterId}
+                          subjectName={selectedQuizData?.subjectName}
+                          chapterName={selectedQuizData?.chapterName}
+                          topicName={selectedQuizData?.topicName}
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* Analytics View */}
-        {activeView === 'analytics' && (
-          <div className="space-y-6">
-            {studyPlan && studyPlan.days && studyPlan.days.length > 0 ? (
-              <ComprehensiveAnalytics />
-            ) : (
-              <div className="group relative">
-                <div className="absolute -inset-1 bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 rounded-[32px] opacity-20 blur-xl"></div>
-                <div className="relative rounded-[30px] bg-white/95 backdrop-blur-2xl shadow-2xl border-2 border-white/60 overflow-hidden p-12 text-center">
-                  <div className="text-6xl mb-4">📊</div>
-                  <h3 className="text-2xl font-black text-slate-900 mb-2">No Analytics Data Yet</h3>
-                  <p className="text-slate-600">Complete some study sessions to see your analytics and progress charts.</p>
+        {
+          activeView === 'analytics' && (
+            <div className="space-y-6">
+              <PsychometricResults />
+              {studyPlan && studyPlan.days && studyPlan.days.length > 0 ? (
+                <ComprehensiveAnalytics />
+              ) : (
+                <div className="group relative">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 rounded-[32px] opacity-20 blur-xl"></div>
+                  <div className="relative rounded-[30px] bg-white/95 backdrop-blur-2xl shadow-2xl border-2 border-white/60 overflow-hidden p-12 text-center">
+                    <div className="text-6xl mb-4">📊</div>
+                    <h3 className="text-2xl font-black text-slate-900 mb-2">No Analytics Data Yet</h3>
+                    <p className="text-slate-600">Complete some study sessions to see your analytics and progress charts.</p>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+              )}
+            </div>
+          )
+        }
+      </div >
+    </div >
   );
 };

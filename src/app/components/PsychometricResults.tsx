@@ -259,7 +259,7 @@ export const PsychometricResults: React.FC<PsychometricResultsProps> = ({ profil
                             <div className="flex items-center gap-3">
                                 <div className="text-right">
                                     <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Aptitude Score</p>
-                                    <p className="text-2xl font-black text-emerald-600">{Math.round(psychometricDetails.accuracy)}%</p>
+                                    <p className="text-2xl font-black text-emerald-600">{Math.round(psychometricDetails.accuracy || 0)}%</p>
                                 </div>
                                 <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
                                     <CheckCircle2 className="w-8 h-8 text-emerald-500" />
@@ -269,10 +269,10 @@ export const PsychometricResults: React.FC<PsychometricResultsProps> = ({ profil
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             {[
-                                { label: 'Numerical', icon: Calculator, color: 'indigo', value: psychometricDetails.categoryScores.numerical },
-                                { label: 'Verbal', icon: MessageSquare, color: 'purple', value: psychometricDetails.categoryScores.verbal },
-                                { label: 'Logical', icon: Puzzle, color: 'fuchsia', value: psychometricDetails.categoryScores.logical },
-                                { label: 'Spatial', icon: Grid3x3, color: 'blue', value: psychometricDetails.categoryScores.spatial }
+                                { label: 'Numerical', icon: Calculator, color: 'indigo', value: psychometricDetails.categoryScores?.numerical || 0 },
+                                { label: 'Verbal', icon: MessageSquare, color: 'purple', value: psychometricDetails.categoryScores?.verbal || 0 },
+                                { label: 'Logical', icon: Puzzle, color: 'fuchsia', value: psychometricDetails.categoryScores?.logical || 0 },
+                                { label: 'Spatial', icon: Grid3x3, color: 'blue', value: psychometricDetails.categoryScores?.spatial || 0 }
                             ].map((cat, idx) => (
                                 <div key={idx} className={`p-5 rounded-2xl bg-${cat.color}-50/50 border border-${cat.color}-100 flex flex-col gap-4 group hover:bg-${cat.color}-50 transition-colors`}>
                                     <div className="flex items-center justify-between">
@@ -298,12 +298,12 @@ export const PsychometricResults: React.FC<PsychometricResultsProps> = ({ profil
                             <div className="flex items-center gap-6">
                                 <div>
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Items Processed</p>
-                                    <p className="font-black text-slate-900 text-lg">{psychometricDetails.correctAnswers} / {psychometricDetails.totalQuestions}</p>
+                                    <p className="font-black text-slate-900 text-lg">{psychometricDetails.correctAnswers || 0} / {psychometricDetails.totalQuestions || 0}</p>
                                 </div>
                                 <div className="w-px h-8 bg-slate-100"></div>
                                 <div>
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Processing Speed</p>
-                                    <p className="font-black text-slate-900 text-lg">{psychometricDetails.avgTimePerQuestion.toFixed(1)}s <span className="text-xs text-slate-400 font-bold">/ q</span></p>
+                                    <p className="font-black text-slate-900 text-lg">{(psychometricDetails.avgTimePerQuestion || 0).toFixed(1)}s <span className="text-xs text-slate-400 font-bold">/ q</span></p>
                                 </div>
                             </div>
                             <div className="bg-emerald-50 px-4 py-2 rounded-xl flex items-center gap-2">

@@ -26,6 +26,29 @@ export const ParentDashboard: React.FC = () => {
             const rawProfile = res.data.profile || {};
             const basicInfo = res.data.basic_info || {};
 
+            // Handle potential snake_case and double-stringification in psychometricDetails
+            let parsedPsychometric = rawProfile.psychometric_details || rawProfile.psychometricDetails;
+
+            // Safely parse if it's a string (fixes double stringification bugs)
+            if (typeof parsedPsychometric === 'string') {
+              try { parsedPsychometric = JSON.parse(parsedPsychometric); } catch (e) { }
+            }
+            if (typeof parsedPsychometric === 'string') {
+              try { parsedPsychometric = JSON.parse(parsedPsychometric); } catch (e) { }
+            }
+
+            if (parsedPsychometric && parsedPsychometric.category_scores) {
+              parsedPsychometric = {
+                ...parsedPsychometric,
+                categoryScores: {
+                  numerical: parsedPsychometric.category_scores.numerical || 0,
+                  verbal: parsedPsychometric.category_scores.verbal || 0,
+                  logical: parsedPsychometric.category_scores.logical || 0,
+                  spatial: parsedPsychometric.category_scores.spatial || 0,
+                }
+              };
+            }
+
             // Map the profile data
             const mappedProfile = {
               ...rawProfile,
@@ -37,7 +60,7 @@ export const ParentDashboard: React.FC = () => {
               stream: rawProfile.stream || "N/A",
               learningSpeed: rawProfile.learning_speed || rawProfile.learningSpeed,
               learningStyle: rawProfile.learning_style || rawProfile.learningStyle,
-              psychometricDetails: rawProfile.psychometric_details || rawProfile.psychometricDetails
+              psychometricDetails: parsedPsychometric
             };
             setUserProfile(mappedProfile);
           }

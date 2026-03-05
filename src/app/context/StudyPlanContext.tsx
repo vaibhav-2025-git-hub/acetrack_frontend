@@ -180,11 +180,45 @@ export const StudyPlanProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const refreshStudyPlan = async () => {
     try {
-      const { studyPlanAPI } = await import('../services/api');
-      const response = await studyPlanAPI.get();
-      if (response.success && response.data) {
-        const mappedPlan = mapBackendPlanToFrontend(response.data);
-        setStudyPlan(mappedPlan as any);
+      const { studyPlanAPI, flashcardsAPI } = await import('../services/api');
+
+      // Fetch study plan and flashcards in parallel
+      const [planResponse, flashcardsResponse] = await Promise.all([
+        studyPlanAPI.get(),
+        flashcardsAPI.get().catch(e => {
+          console.error("Failed to fetch flashcards:", e);
+          return { success: false, data: [] };
+        })
+      ]);
+
+      if (planResponse.success && planResponse.data) {
+        const mappedPlan = mapBackendPlanToFrontend(planResponse.data);
+
+        // If flashcards fetch was successful, map them too (assuming they return arrays of cards)
+        let backendFlashcards = [];
+        if (flashcardsResponse.success && Array.isArray(flashcardsResponse.data)) {
+          // We might need to map them to the frontend Flashcard type if they differ
+          backendFlashcards = flashcardsResponse.data.map((fc: any) => ({
+            id: fc.id.toString(),
+            topicId: fc.topic_id || 'general',
+            subjectId: fc.subject_id,
+            front: fc.question,
+            back: fc.answer,
+            difficulty: fc.difficulty || 'medium',
+            reviewCount: fc.review_count || 0,
+            confidence: fc.correct_count ? Math.min(5, Math.max(1, Math.round(fc.correct_count / (fc.review_count || 1) * 5))) : 0,
+            lastReviewed: fc.last_reviewed,
+            nextReview: fc.next_review_date,
+            createdAt: fc.created_at || new Date().toISOString()
+          }));
+        }
+
+        // Merge mapped plan and preserve/update flashcards
+        setStudyPlan(prev => ({
+          ...prev, // preserve old state if mapBackendPlanToFrontend omits fields
+          ...mappedPlan,
+          flashcards: backendFlashcards.length > 0 ? backendFlashcards : (prev?.flashcards || [])
+        }) as any);
       }
     } catch (error) {
       console.error("Failed to refresh study plan:", error);

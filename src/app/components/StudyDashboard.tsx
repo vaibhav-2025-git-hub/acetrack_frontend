@@ -12,7 +12,6 @@ import { FlashcardStudy } from './FlashcardStudy';
 import { QuizInterface } from './QuizInterface';
 import { ComprehensiveAnalytics } from './ComprehensiveAnalytics';
 import { ParentDashboard } from './ParentDashboard';
-import { PsychometricResults } from './PsychometricResults';
 import { exportToPDF } from '../utils/pdfExport';
 import { toast } from 'sonner';
 import {
@@ -31,9 +30,13 @@ import {
   Activity,
   Bell,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Sparkles,
+  Info,
+  CalendarCheck,
+  Loader2
 } from 'lucide-react';
-import { notificationAPI } from '../services/api';
+import { notificationAPI, studyPlanAPI } from '../services/api';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 import { StudySession } from '../types';
@@ -44,7 +47,7 @@ interface StudyDashboardProps {
 
 export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
   console.log("StudyDashboard rendered with userType:", userType);
-  const { userProfile, studyPlan } = useStudyPlan();
+  const { userProfile, studyPlan, refreshStudyPlan } = useStudyPlan();
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeView, setActiveView] = useState<'schedule' | 'study-tools' | 'analytics'>('schedule');
   const [scheduleTab, setScheduleTab] = useState('daily');
@@ -82,9 +85,48 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // AI Recommendations
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [isApplyingRec, setIsApplyingRec] = useState<number | null>(null);
+
   useEffect(() => {
     loadNotifications();
+    fetchRecommendations();
   }, []);
+
+  const fetchRecommendations = async () => {
+    try {
+      const response = await studyPlanAPI.getRecommendations();
+      if (response.success) {
+        setRecommendations(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to load recommendations");
+    }
+  };
+
+  const handleApplyRecommendation = async (rec: any) => {
+    setIsApplyingRec(rec.id);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = tomorrow.toISOString().split('T')[0];
+
+    try {
+      const response = await studyPlanAPI.applyRecommendation(rec.id, dateStr);
+      if (response.success) {
+        toast.success(`Planned! Deep Dive for ${rec.topic_id} added to tomorrow's schedule.`);
+        setRecommendations(recommendations.filter(r => r.id !== rec.id));
+        // Refresh plan data to show the new session
+        refreshStudyPlan();
+      } else {
+        toast.error(response.message || "Failed to apply recommendation");
+      }
+    } catch (error) {
+      toast.error("Network error while applying recommendation");
+    } finally {
+      setIsApplyingRec(null);
+    }
+  };
 
   const loadNotifications = async () => {
     try {
@@ -295,69 +337,100 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
         <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-purple-100/30 rounded-full blur-3xl"></div>
       </div>
 
-      {/* Header */}
-      <div className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-xl">{userProfile.name.charAt(0)}</span>
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+      {/* Premium Profile Header */}
+      <div className="relative pt-6 pb-2 px-6 lg:px-8 max-w-7xl mx-auto z-10 w-full">
+        <div className="absolute inset-0 bg-gradient-to-b from-indigo-50/50 to-transparent pointer-events-none" />
+        <div className="relative w-full rounded-[36px] bg-white/60 backdrop-blur-3xl border-2 border-white/60 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] p-3 flex flex-col lg:flex-row justify-between items-center gap-4 transition-all duration-500 hover:shadow-[0_16px_60px_-15px_rgba(79,70,229,0.15)] group">
+          {/* Left section: Identity */}
+          <div className="flex items-center gap-5 w-full lg:w-auto px-2">
+            <div className="relative group-hover:scale-105 transition-transform duration-500">
+              <div className="absolute -inset-2 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 rounded-3xl opacity-30 blur-lg group-hover:opacity-60 transition duration-500 animate-pulse" />
+              <div className="relative w-16 h-16 rounded-[20px] bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 flex items-center justify-center shadow-2xl border border-white/20">
+                <span className="text-white font-black text-3xl drop-shadow-md">{userProfile.name.charAt(0)}</span>
               </div>
-              <div>
-                <h1 className="text-xl lg:text-2xl font-bold text-gray-900">
-                  Welcome back, {userProfile.name}! 👋
-                </h1>
-                <div className="flex flex-wrap items-center gap-2 mt-1">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium">
-                    <span>📖</span> Class {userProfile.class}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium">
-                    <span>🎓</span> {userProfile.stream}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">
-                    <span>🏫</span> {userProfile.board.toUpperCase()}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-green-50 text-green-700 text-xs font-bold border border-green-200">
-                    <span>🆔</span> {userProfile.studentCode || 'AceTrack ID'}
-                  </span>
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-400 rounded-full border-4 border-white shadow-sm flex items-center justify-center">
+                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-center">
+              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-br from-slate-900 to-slate-700 tracking-tight leading-tight">
+                {userProfile.name}
+              </h1>
+              <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/80 border border-slate-200/60 shadow-sm text-slate-700 text-[11px] font-bold uppercase tracking-widest">
+                  <span className="text-indigo-500 text-[14px]">📖</span> Class {userProfile.class}
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/80 border border-slate-200/60 shadow-sm text-slate-700 text-[11px] font-bold uppercase tracking-widest">
+                  <span className="text-purple-500 text-[14px]">🎓</span> {userProfile.stream}
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/80 border border-slate-200/60 shadow-sm text-slate-700 text-[11px] font-bold uppercase tracking-widest">
+                  <span className="text-blue-500 text-[14px]">🏫</span> {userProfile.board.toUpperCase()}
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+          </div>
+
+          {/* Center/Right section: AceTrack ID & Actions */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto mt-2 lg:mt-0 px-2 lg:px-4">
+
+            {/* Highly Prominent ID Badge */}
+            <div className="relative overflow-hidden group/badge cursor-default w-full sm:w-auto flex justify-center">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-500 opacity-10 group-hover/badge:opacity-20 transition-opacity duration-300" />
+              <div className="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-100/50 shadow-inner">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600/70 mb-0.5">AceTrack ID</p>
+                  <p className="text-sm font-black text-emerald-700 tracking-wider">
+                    {userProfile.studentCode || `ACE-${userProfile.name.split(' ')[0].toUpperCase()}-${new Date().getFullYear()}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-px h-10 bg-slate-200/50 hidden sm:block mx-1" />
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <Popover open={showNotifications} onOpenChange={setShowNotifications}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="relative font-medium px-3 py-2 rounded-lg bg-white border-gray-200 hover:bg-gray-50 text-gray-700">
-                    <Bell className="w-5 h-5" />
+                  <Button variant="outline" className="relative h-12 w-12 rounded-2xl bg-white hover:bg-slate-50 border-slate-200 shadow-sm transition-all hover:scale-105 hover:shadow-md p-0 flex items-center justify-center">
+                    <Bell className="w-5 h-5 tracking-tight text-slate-600" />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white shadow-sm animate-bounce">
                         {unreadCount}
                       </span>
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 p-0 shadow-xl border-gray-200 rounded-xl" align="end">
-                  <div className="p-4 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
-                    <h4 className="font-semibold text-gray-900">Notifications</h4>
+                <PopoverContent className="w-80 p-0 shadow-2xl border-none rounded-[24px]" align="end" sideOffset={12}>
+                  <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-[24px]">
+                    <h4 className="font-black text-white">Notifications</h4>
+                    <p className="text-xs text-indigo-100/80 font-medium">{unreadCount} unread message{unreadCount !== 1 ? 's' : ''}</p>
                   </div>
-                  <div className="max-h-[300px] overflow-y-auto">
+                  <div className="max-h-[300px] overflow-y-auto bg-white/95 backdrop-blur-xl rounded-b-[24px]">
                     {notifications.length === 0 ? (
-                      <div className="p-8 text-center text-sm text-gray-500">No new notifications</div>
+                      <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center">
+                          <Bell className="w-5 h-5 text-slate-300" />
+                        </div>
+                        <p className="text-sm font-bold text-slate-400">All caught up!</p>
+                      </div>
                     ) : (
                       notifications.map(n => (
                         <div
                           key={n.id}
-                          className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${!n.is_read ? 'bg-indigo-50/30' : ''}`}
+                          className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer ${!n.is_read ? 'bg-indigo-50/30' : ''}`}
                           onClick={() => handleMarkRead(n.id)}
                         >
                           <div className="flex items-start gap-3">
-                            <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!n.is_read ? 'bg-indigo-500' : 'bg-gray-300'}`} />
+                            <div className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ${!n.is_read ? 'bg-indigo-500 animate-pulse' : 'bg-slate-200'}`} />
                             <div>
-                              <p className={`text-sm ${!n.is_read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{n.title}</p>
-                              <p className="text-xs text-gray-500 mt-1 leading-relaxed">{n.message}</p>
-                              <p className="text-[10px] text-gray-400 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+                              <p className={`text-sm tracking-tight ${!n.is_read ? 'font-black text-slate-900' : 'font-bold text-slate-600'}`}>{n.title}</p>
+                              <p className="text-xs font-medium text-slate-500 mt-1 leading-relaxed">{n.message}</p>
+                              <p className="text-[10px] font-bold text-slate-400 mt-2 tracking-wider uppercase">{new Date(n.created_at).toLocaleDateString()}</p>
                             </div>
                           </div>
                         </div>
@@ -367,13 +440,12 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                 </PopoverContent>
               </Popover>
 
-              <Button onClick={handleExportPDF} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg shadow-sm flex-1 lg:flex-none">
+              <Button onClick={handleExportPDF} className="h-12 px-5 rounded-2xl bg-slate-900 hover:bg-indigo-600 text-white font-bold shadow-sm flex-1 sm:flex-none transition-all hover:scale-105 hover:shadow-indigo-500/25">
                 <Download className="w-4 h-4 mr-2" />
-                Export PDF
+                <span className="hidden sm:inline">Export</span> PDF
               </Button>
-              <Button onClick={handleLogout} variant="outline" className="font-medium px-4 py-2 rounded-lg flex-1 lg:flex-none">
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
+              <Button onClick={handleLogout} variant="outline" className="h-12 px-4 rounded-2xl border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 font-bold flex-1 sm:flex-none transition-all">
+                <LogOut className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -382,6 +454,78 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-8">
+
+        {/* Prominent AI Recommendation Card */}
+        {recommendations.length > 0 && (
+          <div className="mb-8 group relative animate-in fade-in slide-in-from-top-4 duration-700">
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-[32px] opacity-20 blur-2xl group-hover:opacity-40 transition-opacity"></div>
+            <div className="relative overflow-hidden rounded-[28px] bg-white border-2 border-indigo-100 shadow-[0_20px_50px_-20px_rgba(79,70,229,0.2)] p-6 lg:p-8">
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                <Brain className="w-48 h-48 rotate-12" />
+              </div>
+
+              <div className="flex flex-col lg:flex-row items-center gap-8 relative z-10">
+                <div className="shrink-0">
+                  <div className="relative">
+                    <div className="absolute -inset-4 bg-indigo-500/20 rounded-full blur-xl animate-pulse"></div>
+                    <div className="relative w-24 h-24 rounded-[32px] bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                      <Sparkles className="w-12 h-12 text-white" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 text-center lg:text-left">
+                  <div className="flex items-center justify-center lg:justify-start gap-2 mb-2">
+                    <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-wider border border-indigo-100">Smart Recommendation</span>
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                  </div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-2">
+                    We noticed you might need a <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Deep Dive</span>
+                  </h2>
+                  <p className="text-slate-600 font-medium leading-relaxed max-w-2xl">
+                    Based on your score of <span className="text-rose-500 font-black">{parseFloat(recommendations[0].score).toFixed(0)}%</span> in the recent
+                    <span className="font-bold text-slate-800"> {recommendations[0].topic_id}</span> quiz, we've prepared a specialized study session to help you master this topic.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <Button
+                    onClick={() => handleApplyRecommendation(recommendations[0])}
+                    disabled={isApplyingRec === recommendations[0].id}
+                    className="h-14 px-8 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black shadow-xl shadow-slate-200 transition-all hover:scale-105 active:scale-95 flex items-center gap-3"
+                  >
+                    {isApplyingRec === recommendations[0].id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <CalendarCheck className="w-5 h-5" />
+                    )}
+                    Add to Tomorrow's Plan
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setRecommendations(recommendations.slice(1))}
+                    className="h-14 px-6 rounded-2xl text-slate-400 font-bold hover:bg-slate-50 transition-all"
+                  >
+                    Maybe Later
+                  </Button>
+                </div>
+              </div>
+
+              {recommendations.length > 1 && (
+                <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-widest">
+                  <span>+ {recommendations.length - 1} more suggestions waiting</span>
+                  <div className="flex gap-1">
+                    {recommendations.map((_, i) => (
+                      <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-indigo-500 w-4' : 'bg-slate-200'} transition-all`} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Stats Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Progress Card */}
@@ -904,11 +1048,17 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   </div>
                   <div className="p-8">
                     <Tabs value={studyToolsTab} onValueChange={(val) => setStudyToolsTab(val as "flashcards" | "quizzes")}>
-                      <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-blue-100/80 to-cyan-100/80 p-2 rounded-2xl border-2 border-white/50 shadow-xl">
-                        <TabsTrigger value="flashcards" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-cyan-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105">
+                      <TabsList className="flex bg-slate-100/50 p-1.5 rounded-2xl w-fit mx-auto shadow-inner border border-slate-200/50 mb-8 backdrop-blur-md">
+                        <TabsTrigger
+                          value="flashcards"
+                          className="rounded-xl px-8 py-3 font-black text-sm transition-all duration-300 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 text-slate-500 hover:text-slate-700 data-[state=active]:scale-105"
+                        >
                           <span className="mr-2 text-base">📚</span> Flashcards
                         </TabsTrigger>
-                        <TabsTrigger value="quizzes" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-2xl data-[state=active]:text-cyan-700 font-bold text-sm py-3 transition-all duration-300 data-[state=active]:scale-105">
+                        <TabsTrigger
+                          value="quizzes"
+                          className="rounded-xl px-8 py-3 font-black text-sm transition-all duration-300 data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 text-slate-500 hover:text-slate-700 data-[state=active]:scale-105"
+                        >
                           <span className="mr-2 text-base">🎯</span> Quizzes
                         </TabsTrigger>
                       </TabsList>
@@ -937,7 +1087,6 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
         {
           activeView === 'analytics' && (
             <div className="space-y-6">
-              <PsychometricResults />
               {studyPlan && studyPlan.days && studyPlan.days.length > 0 ? (
                 <ComprehensiveAnalytics />
               ) : (

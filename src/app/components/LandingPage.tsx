@@ -7,36 +7,8 @@ interface LandingPageProps {
     onAdminLogin?: () => void;
 }
 
-interface VideoModalProps {
-    onClose: () => void;
-}
-
-const VideoModal: React.FC<VideoModalProps> = ({ onClose }) => (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-10">
-        <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-xl" onClick={onClose}></div>
-        <div className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/10 animate-scale-in">
-            <button
-                onClick={onClose}
-                className="absolute top-6 right-6 z-10 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-            >
-                <X className="w-6 h-6" />
-            </button>
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-900/40 to-slate-900/40">
-                <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center mb-8 animate-pulse">
-                    <Play className="w-10 h-10 text-white fill-white" />
-                </div>
-                <h3 className="text-2xl font-black text-white mb-2">AceTrack Platform Overview</h3>
-                <p className="text-slate-400 font-bold">Watch how AI transforms your study planning</p>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                    <Brain className="w-64 h-64 text-indigo-500" />
-                </div>
-            </div>
-        </div>
-    </div>
-);
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin, onAdminLogin }) => {
-    const [isVideoModalOpen, setIsVideoModalOpen] = React.useState(false);
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
@@ -106,16 +78,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
                         >
                             Start Learning for Free
                         </button>
-                        <button
-                            onClick={() => setIsVideoModalOpen(true)}
-                            className="w-full sm:w-auto px-8 py-4 bg-white text-slate-900 rounded-full font-bold text-lg hover:bg-slate-50 border border-slate-200 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
-                        >
-                            Watch Demo <Play className="w-5 h-5 text-indigo-600 fill-indigo-600/10" />
-                        </button>
                     </div>
                 </div>
-
-                {isVideoModalOpen && <VideoModal onClose={() => setIsVideoModalOpen(false)} />}
 
                 {/* High-Fidelity Product Showcase */}
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-24 relative z-10 animate-fade-in-up animation-delay-500">

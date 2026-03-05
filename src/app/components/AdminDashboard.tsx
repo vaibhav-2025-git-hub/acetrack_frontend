@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { adminAPI } from '../services/api';
-import { ShieldAlert, Users, Server, BrainCircuit, Activity, BookOpen, ToggleLeft, ToggleRight, LogOut, Loader2, Search, Ban, Terminal, Globe, ActivitySquare, Send, MessageSquare } from 'lucide-react';
+import { ShieldAlert, Users, Server, BrainCircuit, Activity, BookOpen, ToggleLeft, ToggleRight, LogOut, Loader2, Search, Ban, Terminal, Globe, ActivitySquare, Send, MessageSquare, TrendingUp, Megaphone, Ticket } from 'lucide-react';
 import { toast } from 'sonner';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface AdminDashboardProps {
     onLogout: () => void;
@@ -13,17 +14,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [stats, setStats] = useState<any>(null);
     const [users, setUsers] = useState<any[]>([]);
+    const [analyticsData, setAnalyticsData] = useState<any[]>([]);
+    const [announcements, setAnnouncements] = useState<any[]>([]);
+    const [tickets, setTickets] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [broadcastMessage, setBroadcastMessage] = useState('');
 
-    // Mock Live Feed Data
-    const mockFeed = [
-        { id: 1, time: 'Just now', msg: 'System backup completed successfully.', type: 'system' },
-        { id: 2, time: '2m ago', msg: 'New student registration: dev...y@gmail.com', type: 'user' },
-        { id: 3, time: '5m ago', msg: 'AI Study Plan generated for ADMIN_001', type: 'ai' },
-        { id: 4, time: '12m ago', msg: 'Failed login attempt caught (IP: 192.168.1.104)', type: 'security' },
-        { id: 5, time: '15m ago', msg: 'Parent account linked to student AC-291', type: 'user' },
-    ];
+    // Journey Modal State
+    const [selectedUserJourney, setSelectedUserJourney] = useState<any[] | null>(null);
+    const [journeyModalUser, setJourneyModalUser] = useState<{ id: string | number, name: string } | null>(null);
+    const [isLoadingJourney, setIsLoadingJourney] = useState(false);
+
+    const [systemLogs, setSystemLogs] = useState<any[]>([]);
 
     // Features state
     const [features, setFeatures] = useState({
@@ -36,7 +38,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     useEffect(() => {
         fetchStats();
         fetchUsersList();
+        fetchAnalytics();
+        fetchAnnouncements();
+        fetchTickets();
+        fetchSystemLogs();
+
+        // Refresh logs every 15 seconds for a "live" feel
+        const logInterval = setInterval(fetchSystemLogs, 15000);
+        return () => clearInterval(logInterval);
     }, []);
+
+    const fetchSystemLogs = async () => {
+        try {
+            const res = await adminAPI.getSystemLogs();
+            if (res.success && res.data) {
+                setSystemLogs(res.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch system logs:', error);
+        }
+    };
+
+    const fetchAnnouncements = async () => {
+        try {
+            const res = await adminAPI.getAnnouncements();
+            if (res.success && res.data) {
+                setAnnouncements(res.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch announcements:', error);
+        }
+    };
+
+    const fetchTickets = async () => {
+        try {
+            const res = await adminAPI.getTickets();
+            if (res.success && res.data) {
+                setTickets(res.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch tickets:', error);
+        }
+    };
+
+    const fetchAnalytics = async () => {
+        try {
+            const res = await adminAPI.getAnalytics();
+            if (res.success && res.data?.trendData) {
+                setAnalyticsData(res.data.trendData);
+            }
+        } catch (error) {
+            console.error('Failed to fetch analytics:', error);
+        }
+    };
 
     const fetchStats = async () => {
         try {
@@ -83,10 +137,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         }
     };
 
-    const handleBroadcast = () => {
+    const handleBroadcast = async () => {
         if (!broadcastMessage.trim()) return;
-        toast.success('Broadcast Sent', { description: 'Message dispatched to all active client dashboards.' });
-        setBroadcastMessage('');
+        try {
+            const res = await adminAPI.createAnnouncement(broadcastMessage);
+            if (res.success) {
+                toast.success('Broadcast Sent', { description: 'Message dispatched to all active client dashboards.' });
+                setBroadcastMessage('');
+                fetchAnnouncements(); // Refresh the history
+            } else {
+                toast.error('Failed to send broadcast');
+            }
+        } catch (error) {
+            toast.error('Network error while sending broadcast');
+        }
+    };
+
+    const fetchAndShowUserJourney = async (userId: string | number, userName: string) => {
+        setJourneyModalUser({ id: userId, name: userName });
+        setIsLoadingJourney(true);
+        setSelectedUserJourney(null);
+        try {
+            const res = await adminAPI.getUserJourney(userId);
+            if (res.success && res.data) {
+                setSelectedUserJourney(res.data);
+            } else {
+                toast.error('Failed to load user journey');
+                setJourneyModalUser(null);
+            }
+        } catch (error) {
+            console.error('Failed to fetching journey', error);
+            toast.error('Network error fetching journey');
+            setJourneyModalUser(null);
+        } finally {
+            setIsLoadingJourney(false);
+        }
     };
 
     if (isLoading) {
@@ -185,9 +270,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="relative z-10">
-                            <div className="flex justify-between text-xs font-semibold text-slate-500 mt-4">
-                                <span>Uptime: {stats?.systemHealth?.uptime || '---'}</span>
-                                <span className="flex items-center gap-1">Ping: <span className="text-emerald-400">{stats?.systemHealth?.dbResponseTime || '---'}</span></span>
+                            <div className="flex flex-col gap-2 text-xs font-semibold text-slate-500 mt-4">
+                                <div className="flex justify-between">
+                                    <span>Uptime: {stats?.systemHealth?.uptime || '---'}</span>
+                                    <span>RAM: <span className="text-emerald-400">{stats?.systemHealth?.memoryUsage || '---'}</span></span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Avg Load: {stats?.systemHealth?.loadAvg || '---'}</span>
+                                    <span>CPU Cores: <span className="text-emerald-400">{stats?.systemHealth?.cpuCores || '---'}</span></span>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -212,6 +303,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* God Mode Dashboard - Engagement Trends */}
+                <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl mb-12">
+                    <CardHeader className="border-b border-slate-800/80 pb-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                                    <TrendingUp className="w-5 h-5 text-indigo-400" />
+                                    Platform Engagement Trends (Last 7 Days)
+                                </CardTitle>
+                                <CardDescription className="text-slate-400">
+                                    Visual tracking of new registrations vs study plans generated.
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="pt-6 h-[350px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={analyticsData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorPlans" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <XAxis dataKey="name" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} tickLine={false} axisLine={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px', color: '#f8fafc' }}
+                                    itemStyle={{ fontWeight: 'bold' }}
+                                />
+                                <Area type="monotone" dataKey="users" name="New Users" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorUsers)" />
+                                <Area type="monotone" dataKey="plans" name="Study Plans" stroke="#a855f7" strokeWidth={3} fillOpacity={1} fill="url(#colorPlans)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
 
                 {/* Action Center & User Management */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -304,6 +437,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Recent Announcements History */}
+                        <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl">
+                            <CardHeader className="pb-4 border-b border-slate-800/80">
+                                <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+                                    <Megaphone className="w-5 h-5 text-indigo-400" />
+                                    Announcements History
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0 overflow-y-auto max-h-[300px] custom-scrollbar">
+                                <div className="divide-y divide-slate-800/50">
+                                    {announcements.length === 0 ? (
+                                        <div className="p-6 text-center text-slate-500 text-sm">No recent announcements.</div>
+                                    ) : (
+                                        announcements.map((ann) => (
+                                            <div key={ann.id} className="p-4 hover:bg-slate-800/20 transition-colors">
+                                                <p className="text-sm text-slate-300 mb-2">{ann.message}</p>
+                                                <div className="flex justify-between items-center text-xs text-slate-500">
+                                                    <span>By: {ann.admin_name || 'System'}</span>
+                                                    <span>{new Date(ann.created_at).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
 
                     {/* Operational Center - Right Column */}
@@ -361,6 +521,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                                 <div className="shrink-0 flex items-center gap-2">
                                                     <Button
                                                         variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                                                        onClick={() => fetchAndShowUserJourney(user.id, user.name)}
+                                                    >
+                                                        <ActivitySquare className="w-3 h-3 mr-1" />
+                                                        Journey
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
                                                         size="icon"
                                                         className="w-8 h-8 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
                                                         onClick={() => toast.error('Action Restricted', { description: 'Contact Tier 2 Admin to suspend accounts.' })}
@@ -387,17 +556,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             </CardHeader>
                             <CardContent className="p-4 h-48 overflow-y-auto custom-scrollbar">
                                 <div className="space-y-3">
-                                    {mockFeed.map((item) => (
-                                        <div key={item.id} className="text-xs flex gap-3 animate-fade-in-up">
-                                            <span className="text-slate-600 shrink-0">[{item.time}]</span>
+                                    {systemLogs.map((log) => (
+                                        <div key={log.id} className="text-xs flex gap-3 animate-fade-in-up">
+                                            <span className="text-slate-600 shrink-0">
+                                                [{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
+                                            </span>
                                             <span className={
-                                                item.type === 'security' ? 'text-rose-400' :
-                                                    item.type === 'system' ? 'text-emerald-400' :
-                                                        item.type === 'ai' ? 'text-purple-400' :
-                                                            'text-slate-400'
+                                                log.level === 'error' ? 'text-rose-400' :
+                                                    log.level === 'warning' ? 'text-amber-400' :
+                                                        log.source === 'ai' ? 'text-purple-400' :
+                                                            'text-emerald-400'
                                             }>
-                                                {item.type === 'security' && '> WARNING: '}
-                                                {item.msg}
+                                                {log.level === 'error' && '> ERROR: '}
+                                                {log.level === 'warning' && '> WARNING: '}
+                                                <span className="uppercase text-[10px] opacity-70 mr-1">[{log.source}]</span>
+                                                {log.message}
+                                                {log.user_name && <span className="text-slate-500 ml-1">({log.user_name})</span>}
                                             </span>
                                         </div>
                                     ))}
@@ -408,9 +582,111 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             </CardContent>
                         </Card>
 
+                        {/* Support & Feedback Tickets */}
+                        <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl flex flex-col h-[400px]">
+                            <CardHeader className="border-b border-slate-800/80 pb-4">
+                                <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Ticket className="w-5 h-5 text-purple-400" />
+                                    Support & Feedback Tickets
+                                </CardTitle>
+                                <CardDescription className="text-slate-400">
+                                    Review user-submitted issues, bugs, and generic feedback.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+                                <div className="divide-y divide-slate-800/50">
+                                    {tickets.length === 0 ? (
+                                        <div className="p-8 text-center text-slate-500 text-sm font-medium">No open support tickets. 🎉</div>
+                                    ) : (
+                                        tickets.map((ticket) => (
+                                            <div key={ticket.id} className="p-4 hover:bg-slate-800/20 transition-colors">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="text-sm font-bold text-white max-w-[70%] truncate">{ticket.subject}</h4>
+                                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm border 
+                                                        ${ticket.status === 'open' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                                                            ticket.status === 'in_progress' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                                                'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}
+                                                    >
+                                                        {ticket.status.replace('_', ' ')}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 mb-3 line-clamp-2">{ticket.description}</p>
+                                                <div className="flex justify-between items-center text-[10px] text-slate-500">
+                                                    <span className="truncate max-w-[50%]">{ticket.name} ({ticket.email})</span>
+                                                    <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
                     </div>
                 </div>
             </div>
+
+            {/* User Journey Modal */}
+            {journeyModalUser && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setJourneyModalUser(null)} />
+                    <Card className="w-full max-w-2xl bg-slate-900 border-slate-700 shadow-2xl relative z-10 animate-scale-in flex flex-col max-h-[80vh]">
+                        <CardHeader className="border-b border-slate-800 pb-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                                        <ActivitySquare className="w-5 h-5 text-indigo-400" />
+                                        User Journey Explorer
+                                    </CardTitle>
+                                    <CardDescription className="text-slate-400 mt-1">
+                                        Chronological log for <span className="text-indigo-300 font-semibold">{journeyModalUser.name}</span>
+                                    </CardDescription>
+                                </div>
+                                <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={() => setJourneyModalUser(null)}>
+                                    <span className="sr-only">Close</span>
+                                    <ShieldAlert className="w-5 h-5 opacity-0" /> {/* Spacer */}
+                                    Close
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+                            {isLoadingJourney ? (
+                                <div className="p-12 flex justify-center">
+                                    <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                                </div>
+                            ) : selectedUserJourney && selectedUserJourney.length > 0 ? (
+                                <div className="relative p-6">
+                                    <div className="absolute left-10 top-6 bottom-6 w-px bg-slate-800"></div>
+                                    <div className="space-y-6">
+                                        {selectedUserJourney.map((log, index) => (
+                                            <div key={log.id} className="relative pl-12">
+                                                <div className="absolute left-[-21px] top-1 w-3 h-3 rounded-full bg-indigo-500 ring-4 ring-slate-900 z-10"></div>
+                                                <div className="bg-slate-800/40 rounded-lg p-4 border border-slate-700/50">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <span className="font-bold text-indigo-300 text-sm">{log.action_type.toUpperCase().replace(/_/g, ' ')}</span>
+                                                        <span className="text-xs text-slate-500">
+                                                            {new Date(log.created_at).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                    {log.details && Object.keys(log.details).length > 0 && (
+                                                        <div className="mt-2 p-3 bg-slate-950/50 rounded text-xs font-mono text-slate-400 overflow-x-auto">
+                                                            <pre>{JSON.stringify(log.details, null, 2)}</pre>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-12 text-center text-slate-500">
+                                    No journey data recorded for this user yet.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 };

@@ -47,10 +47,20 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<
 
   try {
     const response = await fetch(`${API_BASE_URL}/${endpoint}`, config);
-    const data = await response.json();
+
+    // Extract response as text first to handle non-JSON errors gracefully
+    const text = await response.text();
+    let data;
+
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (parseError) {
+      console.error('Failed to parse JSON response:', text);
+      throw new Error(`Server returned invalid response: ${text.substring(0, 50)}...`);
+    }
 
     if (!response.ok) {
-      throw new Error(data.message || 'Request failed');
+      throw new Error(data.message || `Request failed with status ${response.status}`);
     }
 
     return data;
@@ -157,10 +167,23 @@ export const studyPlanAPI = {
     return { success: true };
   },
 
-  updateSession: async (sessionId: number | string, updates: { completed?: boolean; duration?: number; status?: 'skipped' | 'completed' | 'not-started' | 'in-progress'; notes?: string; time_remaining?: number; is_timer_active?: boolean }) => {
+  updateSession: async (sessionId: string | number, data: any) => {
     return await apiRequest(`study-plan/session/${sessionId}`, {
       method: 'PATCH',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(data),
+    });
+  },
+
+  getRecommendations: async () => {
+    return await apiRequest('study-plan/recommendations', {
+      method: 'GET',
+    });
+  },
+
+  applyRecommendation: async (id: number | string, date: string) => {
+    return await apiRequest(`study-plan/recommendations/${id}/apply`, {
+      method: 'POST',
+      body: JSON.stringify({ date }),
     });
   },
 };
@@ -202,6 +225,7 @@ export const flashcardsAPI = {
   get: async (subjectId?: string, topicId?: string) => {
 
     // Backend implementation:
+    // router.get('/', getAllFlashcards);
     // router.get('/subjects', getSubjects);
     // router.get('/subject/:subjectId', getFlashcardsBySubject);
 
@@ -209,7 +233,8 @@ export const flashcardsAPI = {
       return await apiRequest(`flashcards/subject/${subjectId}`, { method: 'GET' });
     }
 
-    return await apiRequest(`flashcards/subjects`, { method: 'GET' });
+    // Default to fetching all flashcards instead of just subject names
+    return await apiRequest(`flashcards`, { method: 'GET' });
   },
 
   create: async (flashcardData: any) => {
@@ -341,6 +366,12 @@ export const adminAPI = {
     });
   },
 
+  getAnalytics: async () => {
+    return await apiRequest('admin/analytics', {
+      method: 'GET',
+    });
+  },
+
   getUsers: async () => {
     return await apiRequest('admin/users', {
       method: 'GET',
@@ -351,6 +382,37 @@ export const adminAPI = {
     return await apiRequest('admin/features', {
       method: 'POST',
       body: JSON.stringify({ feature: featureName, active }),
+    });
+  },
+
+  createAnnouncement: async (message: string) => {
+    return await apiRequest('admin/announcements', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  },
+
+  getAnnouncements: async () => {
+    return await apiRequest('admin/announcements', {
+      method: 'GET',
+    });
+  },
+
+  getTickets: async () => {
+    return await apiRequest('admin/tickets', {
+      method: 'GET',
+    });
+  },
+
+  getSystemLogs: async () => {
+    return await apiRequest('admin/logs/system', {
+      method: 'GET',
+    });
+  },
+
+  getUserJourney: async (userId: string | number) => {
+    return await apiRequest(`admin/logs/journey/${userId}`, {
+      method: 'GET',
     });
   },
 };

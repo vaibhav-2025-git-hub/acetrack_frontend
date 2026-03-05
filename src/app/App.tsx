@@ -149,6 +149,28 @@ const AppContent: React.FC = () => {
 
           if (profileResponse.success && profileResponse.data) {
             const rawProfile = profileResponse.data;
+            let parsedPsychometric = rawProfile.psychometric_details || rawProfile.psychometricDetails;
+
+            // Safely parse if it's a string
+            if (typeof parsedPsychometric === 'string') {
+              try { parsedPsychometric = JSON.parse(parsedPsychometric); } catch (e) { }
+            }
+            if (typeof parsedPsychometric === 'string') {
+              try { parsedPsychometric = JSON.parse(parsedPsychometric); } catch (e) { }
+            }
+
+            if (parsedPsychometric && parsedPsychometric.category_scores) {
+              parsedPsychometric = {
+                ...parsedPsychometric,
+                categoryScores: {
+                  numerical: parsedPsychometric.category_scores.numerical || 0,
+                  verbal: parsedPsychometric.category_scores.verbal || 0,
+                  logical: parsedPsychometric.category_scores.logical || 0,
+                  spatial: parsedPsychometric.category_scores.spatial || 0,
+                }
+              };
+            }
+
             const profile: UserProfile = {
               ...rawProfile,
               learningSpeed: rawProfile.learning_speed || rawProfile.learningSpeed,
@@ -157,7 +179,7 @@ const AppContent: React.FC = () => {
               totalDays: rawProfile.study_duration || rawProfile.totalDays,
               studentCode: rawProfile.student_code,
               email: rawProfile.email,
-              psychometricDetails: rawProfile.psychometric_details || rawProfile.psychometricDetails
+              psychometricDetails: parsedPsychometric
             };
             setUserProfile(profile);
             localStorage.setItem("userProfile", JSON.stringify(profile));
@@ -270,6 +292,26 @@ const AppContent: React.FC = () => {
         if (profileResponse.success && profileResponse.data) {
           const rawProfile = profileResponse.data;
 
+          let parsedPsychometric = rawProfile.psychometric_details || rawProfile.psychometricDetails;
+          // Safely parse if it's a string
+          if (typeof parsedPsychometric === 'string') {
+            try { parsedPsychometric = JSON.parse(parsedPsychometric); } catch (e) { }
+          }
+          if (typeof parsedPsychometric === 'string') {
+            try { parsedPsychometric = JSON.parse(parsedPsychometric); } catch (e) { }
+          }
+          if (parsedPsychometric && parsedPsychometric.category_scores) {
+            parsedPsychometric = {
+              ...parsedPsychometric,
+              categoryScores: {
+                numerical: parsedPsychometric.category_scores.numerical || 0,
+                verbal: parsedPsychometric.category_scores.verbal || 0,
+                logical: parsedPsychometric.category_scores.logical || 0,
+                spatial: parsedPsychometric.category_scores.spatial || 0,
+              }
+            };
+          }
+
           // Map snake_case to camelCase
           const profile: UserProfile = {
             ...rawProfile,
@@ -278,7 +320,8 @@ const AppContent: React.FC = () => {
             studyHoursPerDay: rawProfile.study_duration || rawProfile.studyHoursPerDay,
             totalDays: rawProfile.study_duration || rawProfile.totalDays,
             studentCode: rawProfile.student_code, // Mapped from backend join
-            email: rawProfile.email
+            email: rawProfile.email,
+            psychometricDetails: parsedPsychometric
           };
 
           setUserProfile(profile);

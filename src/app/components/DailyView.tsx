@@ -614,16 +614,16 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
 
               {/* Session Core Content */}
               <div className="flex-1">
-                <div className={`absolute -inset-1 bg-gradient-to-r ${cardGradient} rounded-[28px] ${session.status === 'skipped' ? 'opacity-20' : 'opacity-75 group-hover:opacity-100'} blur-lg transition duration-500`}></div>
-                <div className={`relative overflow-hidden rounded-[26px] bg-gradient-to-br ${cardBg} backdrop-blur-xl p-7 shadow-2xl border-2 border-white/60 ${session.status !== 'skipped' && 'group-hover:scale-[1.02]'} transition-all duration-500`}>
+                <div className={`absolute -inset-0.5 bg-gradient-to-r ${cardGradient} rounded-[28px] ${session.status === 'skipped' ? 'opacity-20' : 'opacity-30 group-hover:opacity-50'} blur transition duration-500`}></div>
+                <div className={`relative overflow-hidden rounded-[26px] bg-gradient-to-br ${cardBg} backdrop-blur-xl p-7 shadow-xl border border-white/80 ${session.status !== 'skipped' && 'group-hover:translate-y-[-2px] hover:shadow-2xl'} transition-all duration-500`}>
                   <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/20 to-transparent rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
                   <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tl from-black/5 to-transparent rounded-full -ml-12 -mb-12"></div>
 
                   <div className="relative flex items-start gap-5">
                     <div className="flex-shrink-0">
                       <div className="relative">
-                        <div className={`absolute -inset-1 bg-gradient-to-r ${cardGradient} rounded-[18px] opacity-50 blur`}></div>
-                        <div className={`relative w-16 h-16 rounded-[16px] bg-gradient-to-br ${iconGradient} flex items-center justify-center text-white font-black text-2xl shadow-2xl`}>
+                        <div className={`absolute -inset-1 bg-gradient-to-r ${cardGradient} rounded-[18px] opacity-30 blur`}></div>
+                        <div className={`relative w-16 h-16 rounded-[16px] bg-gradient-to-br ${iconGradient} flex items-center justify-center text-white font-black text-2xl shadow-lg`}>
                           {session.subjectName.charAt(0)}
                         </div>
                       </div>
@@ -771,10 +771,59 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
                       )}
 
                       {session.status === 'completed' && (
-                        <div className="mt-5">
-                          <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm shadow-xl border-2 border-emerald-300/50">
+                        <div className="mt-5 space-y-4">
+                          <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm shadow-md border border-emerald-300/50">
                             <span className="text-base">✓</span> Completed Successfully
                           </div>
+
+                          {/* Inline Quiz Prompt */}
+                          {completedSessionForQuiz && completedSessionForQuiz.id === session.id && (
+                            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-purple-100 shadow-sm mt-4 isolate relative overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+                              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-100 to-pink-50 rounded-full -mr-16 -mt-16 -z-10"></div>
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 relative z-10">
+                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                                  <span className="text-2xl">🎯</span>
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="text-lg font-black text-slate-900 leading-tight">Test Your Knowledge!</h4>
+                                  <p className="text-sm font-semibold text-slate-600 mt-1">Take a quick quiz to reinforce what you've learned about <span className="text-purple-600 font-bold">{session.topicName || session.subjectName}</span>.</p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+                                  <Button
+                                    onClick={() => {
+                                      if (onNavigateToQuiz) {
+                                        onNavigateToQuiz({
+                                          topicId: session.topicId,
+                                          subjectId: session.subjectId,
+                                          chapterId: session.chapterId || session.topicId,
+                                          topicName: session.topicName,
+                                          subjectName: session.subjectName,
+                                          chapterName: session.chapterName || ''
+                                        });
+                                      } else {
+                                        window.location.hash = `#quiz-${session.topicId}`;
+                                        toast.success('Opening quiz interface...');
+                                      }
+                                      setCompletedSessionForQuiz(null);
+                                    }}
+                                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-md sm:w-auto w-full"
+                                  >
+                                    Start Quiz
+                                  </Button>
+                                  <Button
+                                    onClick={() => {
+                                      toast.info('You can take the quiz later from Study Tools!');
+                                      setCompletedSessionForQuiz(null);
+                                    }}
+                                    variant="outline"
+                                    className="border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl sm:w-auto w-full"
+                                  >
+                                    Later
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -872,83 +921,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
         date={currentDate}
       />
 
-      {/* Quiz Prompt Modal */}
-      {
-        completedSessionForQuiz && (
-          <div
-            className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ${quizPromptOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-              }`}
-            onClick={() => {
-              setQuizPromptOpen(false);
-              setCompletedSessionForQuiz(null);
-            }}
-          >
-            <div
-              className={`bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all duration-300 ${quizPromptOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
-                }`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center mb-6">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-xl">
-                  <span className="text-4xl">🎯</span>
-                </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-2">
-                  Test Your Knowledge!
-                </h3>
-                <p className="text-slate-600 font-semibold">
-                  You've completed <span className="text-purple-600 font-bold">{completedSessionForQuiz.topicName}</span>
-                </p>
-                <p className="text-sm text-slate-500 mt-2 font-semibold">
-                  Would you like to take a quick quiz to reinforce what you've learned?
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <Button
-                  onClick={() => {
-                    setQuizPromptOpen(false);
-                    // Navigate to quiz with full session data
-                    if (onNavigateToQuiz) {
-                      onNavigateToQuiz({
-                        topicId: completedSessionForQuiz.topicId,
-                        subjectId: completedSessionForQuiz.subjectId,
-                        chapterId: completedSessionForQuiz.chapterId || completedSessionForQuiz.topicId,
-                        topicName: completedSessionForQuiz.topicName,
-                        subjectName: completedSessionForQuiz.subjectName,
-                        chapterName: completedSessionForQuiz.chapterName || ''
-                      });
-                    } else {
-                      window.location.hash = `#quiz-${completedSessionForQuiz.topicId}`;
-                      toast.success('Opening quiz interface...');
-                    }
-                    setCompletedSessionForQuiz(null);
-                  }}
-                  className="w-full group relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-4 rounded-2xl text-lg"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
-                  <span className="relative z-10">✓ Yes, Start Quiz!</span>
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    setQuizPromptOpen(false);
-                    toast.info('You can always take the quiz later from Study Tools!');
-                    setCompletedSessionForQuiz(null);
-                  }}
-                  variant="outline"
-                  className="w-full font-bold py-4 rounded-2xl text-slate-700 border-2 border-slate-300 hover:bg-slate-50"
-                >
-                  Maybe Later
-                </Button>
-              </div>
-
-              <p className="text-xs text-slate-400 text-center mt-4 font-semibold">
-                💡 Taking quizzes helps solidify your understanding!
-              </p>
-            </div>
-          </div>
-        )
-      }
+      {/* Removed Screen-Blocking Quiz Prompt Modal (Now rendered inline) */}
 
       {/* Keyboard Shortcuts Tooltip */}
       {

@@ -1,5 +1,8 @@
 import React from 'react';
 import { useStudyPlan } from '../context/StudyPlanContext';
+import { exportToPDF } from '../utils/pdfExport';
+import { toast } from 'sonner';
+import { PsychometricResults } from './PsychometricResults';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, Clock, CheckCircle2, Target, Award, Zap, BookOpen, Calendar } from 'lucide-react';
 
@@ -458,7 +461,14 @@ export const ComprehensiveAnalytics: React.FC = () => {
         </div>
       </div>
 
-      <QuizPerformanceAnalytics />
+      {/* Cognitive Precision Integration */}
+      <div className="mt-12">
+        <PsychometricResults />
+      </div>
+
+      <div className="mt-12">
+        <QuizPerformanceAnalytics />
+      </div>
     </div>
   );
 };

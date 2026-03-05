@@ -973,6 +973,15 @@ export const FacultyDashboard: React.FC = () => {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Topic Link</Label>
+                      <Input
+                        value={newFlashcardData.topic_id}
+                        onChange={(e) => setNewFlashcardData({ ...newFlashcardData, topic_id: e.target.value })}
+                        placeholder="e.g. kinematics"
+                        className="h-12 bg-white/50 border-white rounded-2xl font-bold px-4 shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Recall Hook (Question)</Label>
                       <textarea
                         value={newFlashcardData.question}

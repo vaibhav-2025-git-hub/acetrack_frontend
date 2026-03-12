@@ -8,8 +8,7 @@ export const generateAIInsights = (
   const insights: AIInsight[] = [];
   const now = new Date();
 
-  // Analyze recent mood trends
-  const recentMoods = studyPlan.moodHistory.slice(-10);
+  const recentMoods = (studyPlan.moodHistory || []).slice(-10);
   if (recentMoods.length >= 5) {
     const avgMood = recentMoods.reduce((sum, m) => sum + m.moodScore, 0) / recentMoods.length;
     

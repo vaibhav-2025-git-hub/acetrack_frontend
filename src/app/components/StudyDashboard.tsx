@@ -41,15 +41,37 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 import { StudySession } from '../types';
 
+import { useNavigate, useLocation } from 'react-router-dom';
+
 interface StudyDashboardProps {
   userType: 'student' | 'parent';
 }
 
 export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
   console.log("StudyDashboard rendered with userType:", userType);
+  const navigate = useNavigate();
+  const location = useLocation();
   const { userProfile, studyPlan, refreshStudyPlan } = useStudyPlan();
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Tab state derived from URL
   const [activeView, setActiveView] = useState<'schedule' | 'study-tools' | 'analytics'>('schedule');
+  
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.includes('/dashboard/study-tools')) {
+      setActiveView('study-tools');
+    } else if (path.includes('/dashboard/analytics')) {
+      setActiveView('analytics');
+    } else {
+      setActiveView('schedule');
+    }
+  }, [location]);
+
+  const handleTabChange = (view: 'schedule' | 'study-tools' | 'analytics') => {
+    navigate(`/dashboard/${view}`);
+    setActiveView(view);
+  };
   const [scheduleTab, setScheduleTab] = useState('daily');
   const [studyToolsTab, setStudyToolsTab] = useState<'flashcards' | 'quizzes'>('flashcards');
   const [selectedQuizData, setSelectedQuizData] = useState<{
@@ -159,10 +181,8 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
         // Show success message
         toast.success('Logged out successfully!');
 
-        // Reload to reset app state
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
+        // Redirect to landing
+        navigate("/");
       } catch (error) {
         console.error('Logout exception:', error);
         toast.error('Error logging out. Please try again.');
@@ -675,7 +695,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
               <div className="flex gap-3 overflow-x-auto">
                 <Button
                   variant={activeView === 'schedule' ? 'default' : 'outline'}
-                  onClick={() => setActiveView('schedule')}
+                  onClick={() => handleTabChange('schedule')}
                   className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${activeView === 'schedule'
                     ? 'bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 text-white shadow-2xl shadow-indigo-500/50 scale-105 border-2 border-white/20'
                     : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'
@@ -686,7 +706,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                 </Button>
                 <Button
                   variant={activeView === 'study-tools' ? 'default' : 'outline'}
-                  onClick={() => setActiveView('study-tools')}
+                  onClick={() => handleTabChange('study-tools')}
                   className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${activeView === 'study-tools'
                     ? 'bg-gradient-to-r from-blue-500 via-cyan-600 to-teal-600 text-white shadow-2xl shadow-blue-500/50 scale-105 border-2 border-white/20'
                     : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'
@@ -697,7 +717,7 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                 </Button>
                 <Button
                   variant={activeView === 'analytics' ? 'default' : 'outline'}
-                  onClick={() => setActiveView('analytics')}
+                  onClick={() => handleTabChange('analytics')}
                   className={`flex-1 gap-2.5 whitespace-nowrap transition-all duration-500 font-bold text-sm py-6 rounded-[20px] ${activeView === 'analytics'
                     ? 'bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 text-white shadow-2xl shadow-emerald-500/50 scale-105 border-2 border-white/20'
                     : 'bg-white/60 hover:bg-white hover:shadow-xl border-2 border-slate-200/50 text-slate-700 hover:scale-105'

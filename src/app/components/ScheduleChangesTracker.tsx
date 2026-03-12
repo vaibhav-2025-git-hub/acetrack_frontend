@@ -175,7 +175,7 @@ export const ScheduleChangesTracker: React.FC = () => {
                       {change.title}
                     </h4>
                     <Badge variant={getBadgeVariant(change.type)} className="text-xs font-bold whitespace-nowrap">
-                      {change.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                      {change.type.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                     </Badge>
                   </div>
                   <p className="text-sm text-slate-700 font-semibold mb-2">

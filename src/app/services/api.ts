@@ -159,12 +159,7 @@ export const studyPlanAPI = {
   },
 
   completeSession: async (sessionId: number) => {
-    // Backend doesn't have this specific endpoint yet, might need to use progress update or create one
-    //  return await apiRequest(`study-plan/session/${sessionId}/complete`, {
-    //   method: 'POST',
-    // });
-    console.warn('completeSession not fully implemented in backend');
-    return { success: true };
+    return await studyPlanAPI.updateSession(sessionId, { completed: true, status: 'completed' });
   },
 
   updateSession: async (sessionId: string | number, data: any) => {
@@ -204,19 +199,15 @@ export const progressAPI = {
   },
 
   getStats: async () => {
-    // return await apiRequest('progress/stats', {
-    //   method: 'GET',
-    // });
-    console.warn('getStats not fully implemented in backend');
-    return { success: true, data: {} };
+    return await apiRequest('progress/stats', {
+      method: 'GET',
+    });
   },
 
   getAnalytics: async () => {
-    // return await apiRequest('progress/analytics', {
-    //   method: 'GET',
-    // });
-    console.warn('getAnalytics not fully implemented in backend');
-    return { success: true, data: {} };
+    return await apiRequest('progress/analytics', {
+      method: 'GET',
+    });
   },
 };
 
@@ -265,12 +256,9 @@ export const flashcardsAPI = {
   },
 
   getDue: async () => {
-    // Not implemented in backend yet
-    // return await apiRequest('flashcards/due', {
-    //   method: 'GET',
-    // });
-    console.warn('getDue not fully implemented in backend');
-    return { success: true, data: [] };
+    return await apiRequest('flashcards/due', {
+      method: 'GET',
+    });
   },
 
   publish: async (subjectId: string) => {

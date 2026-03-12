@@ -41,7 +41,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   return (
     <div className="relative inline-block">
-      {React.cloneElement(children, {
+      {React.cloneElement(children as React.ReactElement<any>, {
         onMouseEnter: showTooltip,
         onMouseLeave: hideTooltip,
         onFocus: showTooltip,

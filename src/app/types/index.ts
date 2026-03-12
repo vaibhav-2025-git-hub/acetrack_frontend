@@ -62,10 +62,21 @@ export interface StudySession {
   time_remaining?: number;
   is_timer_active?: boolean;
   timer_last_updated?: string;
+  moodScore?: number;
+
 }
 
-// REMOVED: Mood tracking types
-// export interface MoodEntry { ... }
+export interface MoodEntry {
+  id: string;
+  sessionId?: string;
+  date: string;
+  moodScore: number;
+  note?: string;
+  factors?: string[];
+  timestamp: string;
+  subjectId?: string;
+}
+
 
 export interface DailyPlan {
   date: string;
@@ -73,6 +84,7 @@ export interface DailyPlan {
   totalHours: number;
   completedHours: number;
   burnoutLevel: number; // 0-100
+  mood?: 'excellent' | 'good' | 'neutral' | 'tired' | 'stressed';
   isAdapted?: boolean; // Flag if plan was adapted
 }
 
@@ -85,6 +97,8 @@ export interface WeeklySummary {
   weakSubjects: string[];
   strongSubjects: string[];
   streak: number;
+  averageMood?: number;
+  burnoutLevel?: number;
 }
 
 export interface ProgressData {
@@ -254,6 +268,58 @@ export interface SyllabusTracker {
   topicStatus: Record<string, 'completed' | 'in-progress' | 'not-started'>;
 }
 
+// ========= GAMIFICATION TYPES =========
+export interface GamificationProfile {
+  userId: string;
+  level: number;
+  currentXP: number;
+  xpToNextLevel: number;
+  totalXP: number;
+  badges: Badge[];
+  achievements: Achievement[];
+  activeChallenges: Challenge[];
+  completedChallenges: Challenge[];
+  streakFreezes: number;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  unlockedAt: string;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  xpReward: number;
+  icon: string;
+  category: string;
+  condition: { type: string; value: number };
+  unlocked: boolean;
+  unlockedAt?: string;
+}
+
+export interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  type: 'daily' | 'weekly' | 'special';
+  xpReward: number;
+  endDate: string;
+  progress: number;
+  completed: boolean;
+  completedAt?: string;
+  requirement: {
+    type: string;
+    target: number;
+    current: number;
+  };
+}
+
 // ========= SOCIAL & COLLABORATIVE TYPES =========
 export interface StudyCircle {
   id: string;
@@ -402,7 +468,7 @@ export interface ScheduleChange {
 
 export interface StudyPlan {
   dailyPlans: Record<string, DailyPlan>;
-  days: Array<{
+  days?: Array<{
     date: string;
     sessions: StudySession[];
   }>;
@@ -410,8 +476,8 @@ export interface StudyPlan {
   overallProgress: number;
   currentStreak: number;
   longestStreak: number;
-  subjectTracking: Record<string, SubjectTracking>; // Track each subject
-  parentAlerts: ParentAlert[]; // Alerts for parents
+  subjectTracking?: Record<string, SubjectTracking>; // Track each subject
+  parentAlerts?: ParentAlert[]; // Alerts for parents
   scheduleChanges?: ScheduleChange[]; // Track all schedule modifications
 
   // Study tools
@@ -427,4 +493,6 @@ export interface StudyPlan {
   resourceLibrary?: ResourceLibrary;
   learningPattern?: LearningPattern;
   smartRecommendations?: SmartRecommendation[];
+  gamification?: GamificationProfile;
+  moodHistory?: MoodEntry[];
 }

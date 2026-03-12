@@ -53,7 +53,7 @@ export const MonthlyView: React.FC = () => {
           {/* Actual Days */}
           {days.map((date) => {
             const dateStr = date.toISOString().split('T')[0];
-            const dailyPlan = studyPlan.days.find(d => d.date === dateStr);
+            const dailyPlan = (studyPlan.days || []).find(d => d.date === dateStr);
 
             const totalSessions = dailyPlan?.sessions.length || 0;
             const completedSessions = dailyPlan?.sessions.filter(s => s.completed).length || 0;

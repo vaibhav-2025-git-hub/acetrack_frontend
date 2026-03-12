@@ -54,6 +54,7 @@ export const generateCrashCourse = (
           startTime: `${Math.floor(currentTime)}:${Math.round((currentTime % 1) * 60).toString().padStart(2, '0')}`,
           duration: Math.round(hoursPerSubject * 60),
           status: 'not-started',
+          completed: false,
           completionPercentage: 0,
         });
         currentTime += hoursPerSubject;
@@ -122,6 +123,7 @@ export const generateCrashCourse = (
           startTime: `${Math.floor(currentTime)}:${Math.round((currentTime % 1) * 60).toString().padStart(2, '0')}`,
           duration: Math.round(sessionDuration * 60),
           status: 'not-started',
+          completed: false,
           completionPercentage: 0,
         });
 
@@ -179,6 +181,7 @@ export const generateCrashCourse = (
           startTime: `${Math.floor(currentTime)}:${Math.round((currentTime % 1) * 60).toString().padStart(2, '0')}`,
           duration: Math.round(hoursPerTopic * 60),
           status: 'not-started',
+          completed: false,
           completionPercentage: 0,
         });
         currentTime += hoursPerTopic;

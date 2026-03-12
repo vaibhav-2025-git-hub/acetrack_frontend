@@ -64,6 +64,7 @@ export const ProfileSetup: React.FC<ProfileSetupProps> = ({ onComplete }) => {
       studyHoursPerDay: studyHours,
       startDate: new Date().toISOString().split('T')[0],
       totalDays,
+      learningStyle: 'mixed',
     });
   };
 

@@ -20,9 +20,12 @@ import {
   AlertCircle,
   Briefcase,
   Brain,
-  Sparkles
+  Sparkles,
+  Home,
+  ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthPageProps {
   onLogin: (userType: 'student' | 'parent' | 'faculty', userData: any) => void;
@@ -30,6 +33,7 @@ interface AuthPageProps {
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, initialMode = 'login' }) => {
+  const navigate = useNavigate();
   const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
   const [userType, setUserType] = useState<'student' | 'parent' | 'faculty'>('student');
   const [showPassword, setShowPassword] = useState(false);
@@ -237,15 +241,29 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, initialMode = 'logi
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative bg-white overflow-y-auto">
         <div className="w-full max-w-md my-auto">
 
-          {/* Mobile Logo */}
-          <div className="flex lg:hidden flex-col items-center justify-center gap-2 mb-8">
+          {/* Mobile Logo & Home */}
+          <div className="flex lg:hidden flex-col items-center justify-center gap-2 mb-8 relative">
+            <button 
+              onClick={() => navigate('/')}
+              className="absolute left-0 top-0 p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+              title="Back to Home"
+            >
+              <Home className="w-6 h-6" />
+            </button>
             <div className="bg-indigo-600 p-2 rounded-xl">
               <Brain className="w-8 h-8 text-white" />
             </div>
             <span className="text-2xl font-black tracking-tight text-slate-900 mt-2">AceTrack</span>
           </div>
 
-          <div className="mb-8">
+          <div className="mb-8 relative">
+            <button 
+              onClick={() => navigate('/')}
+              className="hidden lg:flex items-center gap-2 text-slate-400 hover:text-indigo-600 font-semibold text-sm mb-4 transition-all hover:-translate-x-1"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </button>
             <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
               {authMode === 'login' ? 'Welcome back' : 'Create an account'}
             </h2>

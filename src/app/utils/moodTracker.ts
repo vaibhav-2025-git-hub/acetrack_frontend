@@ -45,19 +45,18 @@ export const recordSessionMood = (
   const moodScore = moodToScore(mood);
 
   // Update session mood
-  session.mood = mood;
   session.moodScore = moodScore;
   session.completedAt = new Date().toISOString();
 
   // Add to mood history
   const moodEntry: MoodEntry = {
+    id: `mood-${Date.now()}`,
     sessionId,
     date,
-    mood,
     moodScore,
     timestamp: new Date().toISOString(),
     subjectId: session.subjectId,
-    notes,
+    note: notes,
   };
   
   updatedPlan.moodHistory = [...(updatedPlan.moodHistory || []), moodEntry];
@@ -216,6 +215,7 @@ export const getMoodInsights = (plan: StudyPlan) => {
   const subjectMoods: Record<string, { avgMood: number; count: number }> = {};
   
   moodHistory.forEach(entry => {
+    if (!entry.subjectId) return;
     if (!subjectMoods[entry.subjectId]) {
       subjectMoods[entry.subjectId] = { avgMood: 0, count: 0 };
     }

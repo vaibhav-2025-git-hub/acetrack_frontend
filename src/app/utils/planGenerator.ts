@@ -155,6 +155,7 @@ export const generateStudyPlan = (profile: UserProfile): StudyPlan => {
             .padStart(2, '0')}`,
           duration: Math.round(sessionHours * 60), // Convert to minutes
           status: 'not-started',
+          completed: false,
           completionPercentage: 0,
         };
 
@@ -218,6 +219,7 @@ export const generateStudyPlan = (profile: UserProfile): StudyPlan => {
           .padStart(2, '0')}`,
         duration: Math.round(hoursPerSubject * 60),
         status: 'not-started',
+        completed: false,
         completionPercentage: 0,
       };
 

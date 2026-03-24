@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
+import { GlobalAnnouncement } from './GlobalAnnouncement';
 import { adminAPI } from '../services/api';
 import { ShieldAlert, Users, Server, BrainCircuit, Activity, BookOpen, ToggleLeft, ToggleRight, LogOut, Loader2, Search, Ban, Terminal, Globe, ActivitySquare, Send, MessageSquare, TrendingUp, Megaphone, Ticket } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,7 +17,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const [users, setUsers] = useState<any[]>([]);
     const [analyticsData, setAnalyticsData] = useState<any[]>([]);
     const [announcements, setAnnouncements] = useState<any[]>([]);
-    const [tickets, setTickets] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [broadcastMessage, setBroadcastMessage] = useState('');
 
@@ -40,7 +40,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         fetchUsersList();
         fetchAnalytics();
         fetchAnnouncements();
-        fetchTickets();
         fetchSystemLogs();
 
         // Refresh logs every 15 seconds for a "live" feel
@@ -70,16 +69,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         }
     };
 
-    const fetchTickets = async () => {
-        try {
-            const res = await adminAPI.getTickets();
-            if (res.success && res.data) {
-                setTickets(res.data);
-            }
-        } catch (error) {
-            console.error('Failed to fetch tickets:', error);
-        }
-    };
 
     const fetchAnalytics = async () => {
         try {
@@ -185,6 +174,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-300 font-sans p-4 md:p-8 relative overflow-hidden">
+            <GlobalAnnouncement />
             {/* Background Ambience */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none" />
             <div className="absolute top-1/2 left-0 w-[600px] h-[600px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
@@ -578,46 +568,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                     <div className="text-xs flex gap-3 animate-pulse mt-2">
                                         <span className="text-emerald-500">_</span>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Support & Feedback Tickets */}
-                        <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-xl flex flex-col h-[400px]">
-                            <CardHeader className="border-b border-slate-800/80 pb-4">
-                                <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
-                                    <Ticket className="w-5 h-5 text-purple-400" />
-                                    Support & Feedback Tickets
-                                </CardTitle>
-                                <CardDescription className="text-slate-400">
-                                    Review user-submitted issues, bugs, and generic feedback.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="p-0 overflow-y-auto flex-1 custom-scrollbar">
-                                <div className="divide-y divide-slate-800/50">
-                                    {tickets.length === 0 ? (
-                                        <div className="p-8 text-center text-slate-500 text-sm font-medium">No open support tickets. 🎉</div>
-                                    ) : (
-                                        tickets.map((ticket) => (
-                                            <div key={ticket.id} className="p-4 hover:bg-slate-800/20 transition-colors">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h4 className="text-sm font-bold text-white max-w-[70%] truncate">{ticket.subject}</h4>
-                                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm border 
-                                                        ${ticket.status === 'open' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                                                            ticket.status === 'in_progress' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                                                'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}
-                                                    >
-                                                        {ticket.status.replace('_', ' ')}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-slate-400 mb-3 line-clamp-2">{ticket.description}</p>
-                                                <div className="flex justify-between items-center text-[10px] text-slate-500">
-                                                    <span className="truncate max-w-[50%]">{ticket.name} ({ticket.email})</span>
-                                                    <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
                                 </div>
                             </CardContent>
                         </Card>

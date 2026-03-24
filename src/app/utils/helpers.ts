@@ -290,9 +290,59 @@ export const mapBackendPlanToFrontend = (backendPlan: any) => {
     dailyPlans: mappedDailyPlans,
     days: days,
     overallProgress: backendPlan.overall_progress || 0,
-    currentStreak: backendPlan.current_streak || 0,
-    longestStreak: backendPlan.longest_streak || 0,
     subjectTracking: {},
     parentAlerts: []
   };
+};
+
+// Calculate Ace Score (Study Health Gauge 0-100)
+// Weighting: 50% Completion Rate, 30% Quiz Accuracy, 20% Recent Engagement
+export const calculateAceScore = (studyPlan: any): number => {
+  if (!studyPlan || !studyPlan.days || studyPlan.days.length === 0) return 0;
+
+  // 1. Completion Rate (50%)
+  let totalSessions = 0;
+  let completedSessions = 0;
+  
+  // 2. Recent Engagement (20%) - Last 7 days
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  let recentTotalDays = 0;
+  let recentActiveDays = 0;
+
+  studyPlan.days.forEach((day: any) => {
+    // For Completion Rate (only count past and present days, not future)
+    const dayDate = new Date(day.date);
+    if (dayDate <= today) {
+        day.sessions.forEach((session: any) => {
+            totalSessions++;
+            if (session.completed) completedSessions++;
+        });
+    }
+
+    // For Recent Engagement
+    if (dayDate >= sevenDaysAgo && dayDate <= today) {
+        recentTotalDays++;
+        const hasCompletedSession = day.sessions.some((s: any) => s.completed);
+        if (hasCompletedSession) recentActiveDays++;
+    }
+  });
+
+  const completionScore = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 100; // Default to 100 if no sessions past yet
+  const engagementScore = recentTotalDays > 0 ? (recentActiveDays / recentTotalDays) * 100 : 100;
+
+  // 3. Quiz Accuracy (30%)
+  // If no quizzes taken, assume 100% to not penalize new students
+  const quizzes = studyPlan.quizzes || [];
+  const accuracyScore = quizzes.length > 0 
+    ? quizzes.reduce((sum: number, q: any) => sum + q.score, 0) / quizzes.length 
+    : 100;
+
+  // Final Weighted Score
+  const finalScore = (completionScore * 0.5) + (accuracyScore * 0.3) + (engagementScore * 0.2);
+  
+  return Math.round(finalScore);
 };

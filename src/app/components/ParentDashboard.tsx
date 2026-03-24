@@ -2,9 +2,14 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { useStudyPlan } from '../context/StudyPlanContext';
 import { Progress } from './ui/progress';
-import { TrendingUp, TrendingDown, AlertTriangle, Award, Users, Clock, Eye, Activity, Sparkles, Star, CheckCircle2, Target, ShieldCheck, ArrowRight, Bell, BookOpen, PieChart as LucidePieChart } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { toast } from 'sonner';
+import { TrendingUp, TrendingDown, AlertTriangle, Award, Users, Clock, Eye, Activity, Sparkles, Star, CheckCircle2, Target, ShieldCheck, ArrowRight, Bell, BookOpen, PieChart as LucidePieChart, UserCircle } from 'lucide-react';
 import { LineChart, Line, PieChart, Pie, Cell, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { PsychometricResults } from './PsychometricResults';
+import { calculateAceScore } from '../utils/helpers';
+import { GlobalAnnouncement } from './GlobalAnnouncement';
 
 export const ParentDashboard: React.FC = () => {
   const { userProfile, studyPlan, setUserProfile, setStudyPlan } = useStudyPlan();
@@ -12,6 +17,101 @@ export const ParentDashboard: React.FC = () => {
   const [skippedSessions, setSkippedSessions] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [linkCode, setLinkCode] = React.useState('');
+  const [isLinking, setIsLinking] = React.useState(false);
+
+  const fetchChildData = async () => {
+    setIsLoading(true);
+    try {
+      const { parentAPI } = await import('../services/api');
+      const res = await parentAPI.getChildData();
+      if (res.success) {
+        if (res.data.quizHistory) setQuizHistory(res.data.quizHistory);
+        if (res.data.skippedSessions) setSkippedSessions(res.data.skippedSessions);
+
+        if (res.data.profile || res.data.basic_info) {
+          const rawProfile = res.data.profile || {};
+          const basicInfo = res.data.basic_info || {};
+
+          // Handle potential snake_case and double-stringification in psychometricDetails
+          let parsedPsychometric = rawProfile.psychometric_details || rawProfile.psychometricDetails;
+
+          // Safely parse if it's a string (fixes double stringification bugs)
+          if (typeof parsedPsychometric === 'string') {
+            try { parsedPsychometric = JSON.parse(parsedPsychometric); } catch (e) { }
+          }
+          if (typeof parsedPsychometric === 'string') {
+            try { parsedPsychometric = JSON.parse(parsedPsychometric); } catch (e) { }
+          }
+
+          if (parsedPsychometric && parsedPsychometric.category_scores) {
+            parsedPsychometric = {
+              ...parsedPsychometric,
+              categoryScores: {
+                numerical: parsedPsychometric.category_scores.numerical || 0,
+                verbal: parsedPsychometric.category_scores.verbal || 0,
+                logical: parsedPsychometric.category_scores.logical || 0,
+                spatial: parsedPsychometric.category_scores.spatial || 0,
+              }
+            };
+          }
+
+          // Map the profile data
+          const mappedProfile = {
+            ...rawProfile,
+            name: rawProfile.name || basicInfo.name || "Student",
+            email: rawProfile.email || basicInfo.email,
+            studentCode: basicInfo.student_code || rawProfile.studentCode,
+            class: rawProfile.class || "N/A",
+            board: rawProfile.board || "N/A",
+            stream: rawProfile.stream || "N/A",
+            learningSpeed: rawProfile.learning_speed || rawProfile.learningSpeed,
+            learningStyle: rawProfile.learning_style || rawProfile.learningStyle,
+            psychometricDetails: parsedPsychometric
+          };
+          setUserProfile(mappedProfile);
+        }
+
+        if (res.data.studyPlan) {
+          const { mapBackendPlanToFrontend } = await import('../utils/helpers');
+          const mappedPlan = mapBackendPlanToFrontend(res.data.studyPlan);
+          setStudyPlan(mappedPlan as any);
+        }
+        setErrorMsg(null);
+      } else {
+        setErrorMsg(res.message || "Failed to load student data.");
+      }
+    } catch (error) {
+      console.error("Failed to fetch child extra data", error);
+      setErrorMsg("Failed to load student data. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkCode.trim()) {
+      toast.error("Please enter an AceTrack ID");
+      return;
+    }
+
+    setIsLinking(true);
+    try {
+      const { parentAPI } = await import('../services/api');
+      const res = await parentAPI.linkStudent({ studentCode: linkCode.trim() });
+      if (res.success) {
+        toast.success("Student linked successfully! Redirecting...");
+        await fetchChildData();
+      } else {
+        toast.error(res.message || "Linking failed. Check the ID.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Connection error. Try again.");
+    } finally {
+      setIsLinking(false);
+    }
+  };
 
   React.useEffect(() => {
     const fetchChildData = async () => {
@@ -91,32 +191,82 @@ export const ParentDashboard: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
+        <GlobalAnnouncement />
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
         <h2 className="text-xl font-bold text-blue-900">Loading Student Dashboard...</h2>
       </div>
     );
   }
 
-  // If no student is linked or profile couldn't load, show an error message since linking is ONLY during registration
+  // If no student is linked or profile couldn't load, show linking interface
   if (!userProfile || errorMsg) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center p-6 text-center">
-        <Card className="max-w-md w-full border-red-200 bg-red-50 shadow-lg p-8">
-          <div className="flex flex-col items-center gap-4">
-            <AlertTriangle className="w-12 h-12 text-red-400" />
-            <h2 className="text-xl font-bold text-red-900">No Linked Student Found</h2>
-            <p className="text-red-700 text-sm">
-              {errorMsg || "Student accounts must be linked during parent registration. Please contact support if you need assistance."}
-            </p>
-          </div>
+      <div className="min-h-[70vh] flex flex-col relative">
+        <GlobalAnnouncement />
+        <div className="flex-1 flex items-center justify-center p-6">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10" />
+        
+        <Card className="max-w-md w-full border-2 border-white/60 bg-white/80 backdrop-blur-2xl shadow-2xl rounded-[38px] overflow-hidden">
+          <CardHeader className="text-center pb-2">
+            <div className="mx-auto w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4">
+              <Users className="w-8 h-8 text-indigo-500" />
+            </div>
+            <CardTitle className="text-2xl font-black text-slate-900">Link Your Student</CardTitle>
+            <p className="text-slate-500 font-bold text-sm mt-1">Enter your child's unique AceTrack ID</p>
+          </CardHeader>
+          <CardContent className="p-8">
+            <form onSubmit={handleLink} className="space-y-6">
+              <div className="space-y-2">
+                <div className="relative">
+                  <UserCircle className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+                  <Input 
+                    placeholder="ACE-XXXX-XXXX" 
+                    className="pl-10 h-12 rounded-xl border-slate-200 bg-white shadow-inner"
+                    value={linkCode}
+                    onChange={(e) => setLinkCode(e.target.value)}
+                  />
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
+                  You can find this on your child's profile page
+                </p>
+              </div>
+
+              {errorMsg && (
+                <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              <Button 
+                type="submit"
+                disabled={isLinking}
+                className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-100 transition-all active:scale-95"
+              >
+                {isLinking ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                    <span>Linking...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span>Synchronize Accounts</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                )}
+              </Button>
+            </form>
+          </CardContent>
         </Card>
+        </div>
       </div>
     );
   }
 
   // Real data processing
   // Depending on how mapBackendPlanToFrontend structures it, it uses `days` array.
-  const activePlan = studyPlan || { days: [], currentStreak: 0, longestStreak: 0 };
+  const activePlan = studyPlan || { days: [] };
 
   // Calculate overall stats from days
   const dailyPlansArray = activePlan.days || [];
@@ -141,6 +291,8 @@ export const ParentDashboard: React.FC = () => {
   );
 
   const completionRate = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
+  // Use calculateAceScore logic instead of simple completion
+  const aceScore = calculateAceScore(activePlan);
 
   // Average burnout (if available, otherwise 0)
   const avgBurnout = 0;
@@ -273,6 +425,7 @@ export const ParentDashboard: React.FC = () => {
 
   return (
     <div className="relative space-y-10 pb-12">
+      <GlobalAnnouncement />
       {/* Background Ambience */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none -z-10" />
       <div className="absolute bottom-1/2 left-0 w-[400px] h-[400px] bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10" />
@@ -304,16 +457,15 @@ export const ParentDashboard: React.FC = () => {
                   stroke="currentColor"
                   strokeWidth="12"
                   strokeDasharray={628}
-                  strokeDashoffset={628 - (628 * (completionRate / 100))}
+                  strokeDashoffset={628 - (628 * (aceScore / 100))}
                   strokeLinecap="round"
-                  className={`transition-all duration-1000 ease-out ${completionRate >= 80 ? 'text-emerald-500' : completionRate >= 50 ? 'text-indigo-500' : 'text-blue-500'
-                    }`}
+                  className="transition-all duration-1000 ease-out text-pink-500"
                   style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-black text-slate-900">{completionRate.toFixed(0)}%</span>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Goal Mastery</span>
+                <span className="text-4xl font-black text-slate-900">{aceScore}</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Ace Score</span>
               </div>
             </div>
 
@@ -334,10 +486,6 @@ export const ParentDashboard: React.FC = () => {
                   <div className="bg-white/50 backdrop-blur px-4 py-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
                     <Target className="w-4 h-4 text-indigo-500" />
                     <span className="text-xs font-black text-slate-700">{completedSessions}/{totalSessions} <span className="text-slate-400 font-bold">Sessions</span></span>
-                  </div>
-                  <div className="bg-white/50 backdrop-blur px-4 py-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                    <span className="text-xs font-black text-slate-700">{activePlan.currentStreak || 0} <span className="text-slate-400 font-bold">Streak</span></span>
                   </div>
                 </div>
               </div>

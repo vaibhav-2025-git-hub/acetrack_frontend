@@ -1,4 +1,4 @@
-// Comprehensive curriculum data for Class 11 & 12 - All Boards and Streams
+// Comprehensive curriculum data for Class 12 - All Boards and Streams
 
 export interface Topic {
   id: string;

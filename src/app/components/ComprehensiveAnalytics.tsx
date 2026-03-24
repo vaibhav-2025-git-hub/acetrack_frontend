@@ -1,10 +1,12 @@
+import { StudySession, DailyPlan } from '../types';
+import { calculateAceScore } from '../utils/helpers';
 import React from 'react';
 import { useStudyPlan } from '../context/StudyPlanContext';
 import { exportToPDF } from '../utils/pdfExport';
 import { toast } from 'sonner';
 import { PsychometricResults } from './PsychometricResults';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts';
-import { TrendingUp, TrendingDown, Activity, Clock, CheckCircle2, Target, Award, Zap, BookOpen, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Clock, CheckCircle2, Target, Award, Zap, BookOpen, Calendar, Star } from 'lucide-react';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f97316'];
 
@@ -136,27 +138,13 @@ export const ComprehensiveAnalytics: React.FC = () => {
       overallProgress: totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0,
       avgSessionDuration: totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0,
       subjects,
-      dailyProgress: dailyProgress.slice(-14), // Last 14 days
+      dailyProgress: dailyProgress, // Show all days
       weeklyData: weeklyData.filter(w => w.sessions > 0).slice(0, 8),
       daysActive: dailyProgress.filter(d => d.completed > 0).length,
-      currentStreak: calculateStreak()
+      aceScore: studyPlan ? calculateAceScore(studyPlan) : 0,
     };
   };
 
-  const calculateStreak = () => {
-    let streak = 0;
-    for (let i = daysData.length - 1; i >= 0; i--) {
-      const day = daysData[i];
-      const dayDate = new Date(day.date);
-      if (dayDate > new Date()) break;
-      if (day.sessions.some(s => s.completed)) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-    return streak;
-  };
 
   const stats = calculateStats();
 
@@ -191,6 +179,21 @@ export const ComprehensiveAnalytics: React.FC = () => {
           </div>
         </div>
 
+        {/* Ace Score */}
+        <div className="group relative">
+          <div className="absolute -inset-0.5 rounded-2xl opacity-75 group-hover:opacity-100 blur transition duration-300 bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500"></div>
+          <div className="relative bg-white rounded-xl p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-pink-500 to-rose-600">
+                <Star className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <p className="text-3xl font-black text-slate-900">{stats.aceScore}</p>
+            <p className="text-sm text-slate-600 font-semibold mt-1">Ace Score</p>
+            <p className="text-xs text-slate-500 mt-2">Study Health</p>
+          </div>
+        </div>
+
         {/* Study Hours */}
         <div className="group relative">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400 via-cyan-500 to-teal-500 rounded-2xl opacity-75 group-hover:opacity-100 blur transition duration-300"></div>
@@ -206,20 +209,6 @@ export const ComprehensiveAnalytics: React.FC = () => {
           </div>
         </div>
 
-        {/* Current Streak */}
-        <div className="group relative">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 rounded-2xl opacity-75 group-hover:opacity-100 blur transition duration-300"></div>
-          <div className="relative bg-white rounded-xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
-                <Zap className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <p className="text-3xl font-black text-slate-900">{stats.currentStreak}</p>
-            <p className="text-sm text-slate-600 font-semibold mt-1">Day Streak</p>
-            <p className="text-xs text-slate-500 mt-2">Keep it going! 🔥</p>
-          </div>
-        </div>
 
         {/* Days Active */}
         <div className="group relative">
@@ -250,7 +239,7 @@ export const ComprehensiveAnalytics: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900">Daily Progress</h3>
-                  <p className="text-xs text-slate-600">Last 14 days completion rate</p>
+                  <p className="text-xs text-slate-600">Overall daily completion rate</p>
                 </div>
               </div>
             </div>

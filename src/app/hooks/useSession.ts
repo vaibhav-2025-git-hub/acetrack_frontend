@@ -20,14 +20,32 @@ export const useSession = () => {
     setIsParentMode
   } = useStudyPlan();
 
-  const [userType, setUserType] = useState<UserType>("student");
-  const [tempProfile, setTempProfile] = useState<Partial<UserProfile>>({});
+  const [userType, setUserType] = useState<UserType>(() => {
+    return (localStorage.getItem("userType") as UserType) || "student";
+  });
+  const [tempProfile, setTempProfile] = useState<Partial<UserProfile>>(() => {
+    try {
+      const saved = localStorage.getItem("acetrack_tempProfile");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [isInitializing, setIsInitializing] = useState(true);
 
+  // Sync tempProfile to localStorage to prevent data loss on page refresh mid-setup
+  useEffect(() => {
+    if (Object.keys(tempProfile).length > 0) {
+      localStorage.setItem("acetrack_tempProfile", JSON.stringify(tempProfile));
+    } else {
+      localStorage.removeItem("acetrack_tempProfile");
+    }
+  }, [tempProfile]);
   // Check for saved authentication and profile on mount
   useEffect(() => {
     const restoreSession = async () => {
+      console.log("[DEBUG] restoreSession started");
       const savedAuth = localStorage.getItem("isAuthenticated");
       const savedUserType = localStorage.getItem("userType");
       const savedProfile = localStorage.getItem("userProfile");
@@ -41,19 +59,28 @@ export const useSession = () => {
 
           if (!token) throw new Error("No token found");
 
-          const verifyRes = await authAPI.verifyToken(token).catch(() => ({ success: false }));
+          const verifyRes = await authAPI.verifyToken(token).catch((err) => {
+            console.error("Token verification HTTP error:", err);
+            return { success: false, status: err.status || 500 };
+          });
 
           if (!verifyRes.success) {
-            console.warn("Token verification failed, clearing session");
-            localStorage.clear();
-            setIsAuthenticated(false);
+            console.warn("Token verification failed with status:", verifyRes.status);
+            // Only clear storage and redirect if it's explicitly an unauthorized error (401)
+            // If it's a 500 or network error, we might want to keep the session and try again
+            if (verifyRes.status === 401) {
+              console.warn("Explicit 401 Unauthorized, clearing session");
+              localStorage.removeItem("isAuthenticated");
+              localStorage.removeItem("acetrack_token");
+              setIsAuthenticated(false);
+            }
             setIsInitializing(false);
             return;
           }
         } catch (e) {
           console.error("Session verification error", e);
-          localStorage.clear();
-          setIsAuthenticated(false);
+          // Do not clear everything on error. Only clear if we are sure the session is invalid.
+          // For unknown errors, we let the user stay in their current state and hope for the best on next action.
           setIsInitializing(false);
           return;
         }
@@ -83,10 +110,32 @@ export const useSession = () => {
           const { profileAPI, studyPlanAPI, progressAPI } = await import("../services/api");
 
           console.log("Restoring student session from backend...");
-          const profileResponse = await profileAPI.get();
+          let profileResponse;
+          let retryCount = 0;
+          const maxRetries = 1;
+
+          const fetchProfile = async () => {
+            try {
+              return await profileAPI.get();
+            } catch (e: any) {
+              console.warn(`Profile fetch attempt failed:`, e.message);
+              return { success: false, status: e.status || 500 };
+            }
+          };
+
+          profileResponse = await fetchProfile();
+
+          // Simple retry for transient network errors (non-401)
+          if (!profileResponse.success && profileResponse.status !== 401 && retryCount < maxRetries) {
+            retryCount++;
+            console.log(`Retrying profile fetch (attempt ${retryCount})...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            profileResponse = await fetchProfile();
+          }
 
           if (profileResponse.success && profileResponse.data) {
             const rawProfile = profileResponse.data;
+            // ... (rest of the mapping code remains the same)
             let parsedPsychometric = rawProfile.psychometric_details || rawProfile.psychometricDetails;
 
             if (typeof parsedPsychometric === 'string') {
@@ -116,14 +165,15 @@ export const useSession = () => {
               totalDays: rawProfile.study_duration || rawProfile.totalDays,
               studentCode: rawProfile.student_code,
               email: rawProfile.email,
-              psychometricDetails: parsedPsychometric
+              psychometricDetails: parsedPsychometric,
+              startDate: rawProfile.start_date || rawProfile.startDate || new Date().toISOString().split('T')[0]
             };
             setUserProfile(profile);
             localStorage.setItem("userProfile", JSON.stringify(profile));
 
             const [planRes, progRes] = await Promise.all([
-              studyPlanAPI.get().catch(e => ({ success: false, error: e })),
-              progressAPI.get().catch(e => ({ success: false, error: e }))
+              studyPlanAPI.get().catch(e => ({ success: false, status: e.status || 500 })),
+              progressAPI.get().catch(e => ({ success: false, status: e.status || 500 }))
             ]);
 
             if (planRes.success && planRes.data) {
@@ -146,11 +196,15 @@ export const useSession = () => {
               setProgressData(mappedProgress);
               localStorage.setItem("progressData", JSON.stringify(mappedProgress));
             }
+          } else if (profileResponse.status === 401) {
+             console.warn("Unauthorized profile fetch, clearing session");
+             localStorage.removeItem("isAuthenticated");
+             localStorage.removeItem("acetrack_token");
+             setIsAuthenticated(false);
           } else if (savedProfile) {
+            console.log("Using cached profile due to fetch failure (non-401)");
             setUserProfile(JSON.parse(savedProfile));
             if (savedPlan) setStudyPlan(JSON.parse(savedPlan));
-          } else {
-            setIsAuthenticated(false);
           }
         } catch (e) {
           console.error("Critical error during session restoration", e);
@@ -222,7 +276,8 @@ export const useSession = () => {
             totalDays: rawProfile.study_duration || rawProfile.totalDays,
             studentCode: rawProfile.student_code,
             email: rawProfile.email,
-            psychometricDetails: parsedPsychometric
+            psychometricDetails: parsedPsychometric,
+            startDate: rawProfile.start_date || rawProfile.startDate || new Date().toISOString().split('T')[0]
           };
 
           setUserProfile(profile);
@@ -343,7 +398,8 @@ export const useSession = () => {
         study_duration: completeProfile.totalDays,
         selected_subjects: completeProfile.selectedSubjects,
         subject_difficulties: completeProfile.subjectDifficulties,
-        psychometric_details: completeProfile.psychometricDetails
+        psychometric_details: completeProfile.psychometricDetails,
+        start_date: toISODate(completeProfile.startDate)
       };
 
       await profileAPI.create(profilePayload);
@@ -356,6 +412,8 @@ export const useSession = () => {
       };
 
       await studyPlanAPI.create(planPayload);
+      
+      setTempProfile({}); // Clear temp profile on success
       
       try {
         const freshPlanRes = await studyPlanAPI.get();

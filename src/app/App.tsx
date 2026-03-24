@@ -200,11 +200,11 @@ const AppRoutes: React.FC = () => {
         <Route path="/dashboard/*" element={
           !isAuthenticated ? <Navigate to="/auth" replace /> : (
             userType === "faculty" ? (
-              <FacultyDashboard />
+              <FacultyDashboard onLogout={handleLogout} />
             ) : userType === "platform_admin" ? (
               <Navigate to="/admin-dashboard" replace />
             ) : (
-              <StudyDashboard userType={userType as "student" | "parent"} />
+              <StudyDashboard userType={userType as "student" | "parent"} onLogout={handleLogout} />
             )
           )
         } />

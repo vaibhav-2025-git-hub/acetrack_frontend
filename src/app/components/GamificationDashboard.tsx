@@ -69,16 +69,7 @@ export const GamificationDashboard: React.FC = () => {
           </div>
         </Card>
 
-        {/* Streak Freezes */}
-        <Card className="p-6 bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Streak Freezes</p>
-              <p className="text-4xl font-bold">{profile.streakFreezes}</p>
-            </div>
-            <Shield className="w-12 h-12 opacity-80" />
-          </div>
-        </Card>
+
       </div>
 
       {/* Tabs */}

@@ -96,7 +96,7 @@ export interface WeeklySummary {
   completedHours: number;
   weakSubjects: string[];
   strongSubjects: string[];
-  streak: number;
+  aceScore?: number;
   averageMood?: number;
   burnoutLevel?: number;
 }
@@ -279,7 +279,6 @@ export interface GamificationProfile {
   achievements: Achievement[];
   activeChallenges: Challenge[];
   completedChallenges: Challenge[];
-  streakFreezes: number;
 }
 
 export interface Badge {
@@ -358,7 +357,6 @@ export interface LeaderboardEntry {
   avatar?: string;
   rank: number;
   studyHours: number;
-  streak: number;
 }
 
 export interface StudyBuddy {
@@ -474,8 +472,7 @@ export interface StudyPlan {
   }>;
   weeklySummaries: WeeklySummary[];
   overallProgress: number;
-  currentStreak: number;
-  longestStreak: number;
+  aceScore?: number;
   subjectTracking?: Record<string, SubjectTracking>; // Track each subject
   parentAlerts?: ParentAlert[]; // Alerts for parents
   scheduleChanges?: ScheduleChange[]; // Track all schedule modifications

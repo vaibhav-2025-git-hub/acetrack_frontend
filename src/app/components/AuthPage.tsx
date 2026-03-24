@@ -446,8 +446,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, initialMode = 'logi
                           onChange={(e) => handleInputChange('studentClass', e.target.value)}
                           className={`w-full px-4 h-11 border rounded-xl bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600 ${errors.studentClass ? 'border-red-500' : 'border-slate-200'}`}
                         >
-                          <option value="">Select</option>
-                          <option value="11">Class 11</option>
                           <option value="12">Class 12</option>
                         </select>
                         {errors.studentClass && <p className="text-xs text-red-500 mt-1">{errors.studentClass}</p>}

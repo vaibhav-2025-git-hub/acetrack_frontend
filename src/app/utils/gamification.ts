@@ -5,7 +5,6 @@ const XP_REWARDS = {
   SESSION_COMPLETE: 50,
   TOUGH_SUBJECT: 75,
   EARLY_STUDY: 25, // Before 8 AM
-  STREAK_DAY: 30,
   PERFECT_DAY: 100, // All sessions completed
   MOOD_EXCELLENT: 20,
   FIRST_SESSION: 10,
@@ -32,7 +31,6 @@ export const initializeGamification = (userId: string): GamificationProfile => {
     achievements: getAllAchievements(),
     activeChallenges: generateDailyChallenges(),
     completedChallenges: [],
-    streakFreezes: 2, // Start with 2 streak freezes
   };
 };
 
@@ -81,47 +79,6 @@ export const awardSessionXP = (
 // Define all achievements
 export const getAllAchievements = (): Achievement[] => {
   return [
-    // Streak achievements
-    {
-      id: 'streak-3',
-      title: 'Getting Started',
-      description: 'Maintain a 3-day study streak',
-      xpReward: 100,
-      icon: '🔥',
-      category: 'streak',
-      condition: { type: 'streak', value: 3 },
-      unlocked: false,
-    },
-    {
-      id: 'streak-7',
-      title: 'Week Warrior',
-      description: 'Maintain a 7-day study streak',
-      xpReward: 250,
-      icon: '⚡',
-      category: 'streak',
-      condition: { type: 'streak', value: 7 },
-      unlocked: false,
-    },
-    {
-      id: 'streak-30',
-      title: 'Monthly Master',
-      description: 'Maintain a 30-day study streak',
-      xpReward: 1000,
-      icon: '👑',
-      category: 'streak',
-      condition: { type: 'streak', value: 30 },
-      unlocked: false,
-    },
-    {
-      id: 'streak-100',
-      title: 'Century Champion',
-      description: 'Maintain a 100-day study streak',
-      xpReward: 5000,
-      icon: '💎',
-      category: 'streak',
-      condition: { type: 'streak', value: 100 },
-      unlocked: false,
-    },
     
     // Study time achievements
     {
@@ -365,9 +322,6 @@ export const checkAchievements = (
     let shouldUnlock = false;
 
     switch (achievement.condition.type) {
-      case 'streak':
-        shouldUnlock = studyPlan.currentStreak >= achievement.condition.value;
-        break;
       case 'total-hours':
         const totalHours = Object.values(studyPlan.dailyPlans).reduce(
           (sum, day) => sum + day.completedHours,
@@ -461,17 +415,6 @@ export const checkAndAwardBadges = (
     });
   }
 
-  // Streak badges
-  if (studyPlan.longestStreak >= 30 && !profile.badges.find(b => b.id === 'streak-30')) {
-    newBadges.push({
-      id: 'streak-30',
-      name: 'Consistency King',
-      description: '30-day streak achieved',
-      icon: '🔥',
-      rarity: 'epic',
-      unlockedAt: new Date().toISOString(),
-    });
-  }
 
   return {
     ...profile,
@@ -483,10 +426,10 @@ export const checkAndAwardBadges = (
 export const getLeaderboardData = (currentUserId: string) => {
   // In production, this would fetch from backend
   return [
-    { userId: '1', userName: 'Rahul S.', avatar: '👨‍🎓', rank: 1, xp: 15420, level: 35, studyHours: 245, streak: 45, badges: 12 },
-    { userId: '2', userName: 'Priya M.', avatar: '👩‍🎓', rank: 2, xp: 14280, level: 33, studyHours: 232, streak: 38, badges: 11 },
-    { userId: currentUserId, userName: 'You', avatar: '🎯', rank: 3, xp: 12500, level: 30, studyHours: 198, streak: 28, badges: 9 },
-    { userId: '4', userName: 'Arjun K.', avatar: '👨‍🎓', rank: 4, xp: 11200, level: 28, studyHours: 185, streak: 25, badges: 8 },
-    { userId: '5', userName: 'Sneha P.', avatar: '👩‍🎓', rank: 5, xp: 9800, level: 26, studyHours: 167, streak: 20, badges: 7 },
+    { userId: '1', userName: 'Rahul S.', avatar: '👨‍🎓', rank: 1, xp: 15420, level: 35, studyHours: 245, badges: 12 },
+    { userId: '2', userName: 'Priya M.', avatar: '👩‍🎓', rank: 2, xp: 14280, level: 33, studyHours: 232, badges: 11 },
+    { userId: currentUserId, userName: 'You', avatar: '🎯', rank: 3, xp: 12500, level: 30, studyHours: 198, badges: 9 },
+    { userId: '4', userName: 'Arjun K.', avatar: '👨‍🎓', rank: 4, xp: 11200, level: 28, studyHours: 185, badges: 8 },
+    { userId: '5', userName: 'Sneha P.', avatar: '👩‍🎓', rank: 5, xp: 9800, level: 26, studyHours: 167, badges: 7 },
   ];
 };

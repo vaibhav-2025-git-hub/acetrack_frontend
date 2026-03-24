@@ -105,19 +105,6 @@ export const generateAIInsights = (
     });
   }
 
-  // Streak insights
-  if (studyPlan.currentStreak >= 7) {
-    insights.push({
-      id: `insight-${now.getTime()}-streak`,
-      type: 'performance-insight',
-      title: 'Great Streak!',
-      message: `You're on a ${studyPlan.currentStreak}-day streak! Keep up the excellent work. Consider using a streak freeze if you need a break.`,
-      priority: 'low',
-      actionable: false,
-      createdAt: now.toISOString(),
-      dismissed: false,
-    });
-  }
 
   return insights;
 };

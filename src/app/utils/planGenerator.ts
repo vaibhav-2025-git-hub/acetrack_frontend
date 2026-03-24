@@ -267,7 +267,6 @@ export const generateStudyPlan = (profile: UserProfile): StudyPlan => {
       burnoutLevel: 0,
       weakSubjects: [],
       strongSubjects: [],
-      streak: 0,
     });
   }
 
@@ -277,8 +276,6 @@ export const generateStudyPlan = (profile: UserProfile): StudyPlan => {
     dailyPlans,
     weeklySummaries,
     overallProgress: 0,
-    currentStreak: 0,
-    longestStreak: 0,
   };
 };
 

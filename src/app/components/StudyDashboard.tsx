@@ -12,10 +12,11 @@ import { FlashcardStudy } from './FlashcardStudy';
 import { QuizInterface } from './QuizInterface';
 import { ComprehensiveAnalytics } from './ComprehensiveAnalytics';
 import { ParentDashboard } from './ParentDashboard';
+import { GlobalAnnouncement } from './GlobalAnnouncement';
 import { exportToPDF } from '../utils/pdfExport';
+import { calculateAceScore } from '../utils/helpers';
 import { toast } from 'sonner';
 import {
-  Trophy,
   Zap,
   Target,
   Calendar,
@@ -34,7 +35,11 @@ import {
   Sparkles,
   Info,
   CalendarCheck,
-  Loader2
+  Loader2,
+  Trophy,
+  Award,
+  Shield,
+  Star
 } from 'lucide-react';
 import { notificationAPI, studyPlanAPI } from '../services/api';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -45,13 +50,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 interface StudyDashboardProps {
   userType: 'student' | 'parent';
+  onLogout: () => void;
 }
 
-export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
+export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType, onLogout }) => {
   console.log("StudyDashboard rendered with userType:", userType);
   const navigate = useNavigate();
   const location = useLocation();
-  const { userProfile, studyPlan, refreshStudyPlan } = useStudyPlan();
+  const { userProfile, studyPlan, refreshStudyPlan, isAuthenticated } = useStudyPlan();
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   
   // Tab state derived from URL
@@ -88,11 +94,11 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
     completedSessions: 0,
     totalHours: 0,
     completedHours: 0,
-    currentStreak: 0,
     daysWithActivity: 0,
     todayProgress: 0,
     todayCompleted: 0,
-    todayTotal: 0
+    todayTotal: 0,
+    aceScore: 0
   });
 
   // Notifications
@@ -111,10 +117,69 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [isApplyingRec, setIsApplyingRec] = useState<number | null>(null);
 
-  useEffect(() => {
-    loadNotifications();
-    fetchRecommendations();
-  }, []);
+  // Calculate real-time statistics from actual data
+  const calculateStats = () => {
+    if (!studyPlan?.days || studyPlan.days.length === 0) {
+      return {
+        overallProgress: 0,
+        totalSessions: 0,
+        completedSessions: 0,
+        totalHours: 0,
+        completedHours: 0,
+        daysWithActivity: 0,
+        todayProgress: 0,
+        todayCompleted: 0,
+        todayTotal: 0,
+        aceScore: 0
+      };
+    }
+
+    let totalSessions = 0;
+    let completedSessions = 0;
+    let totalMinutes = 0;
+    let completedMinutes = 0;
+    let daysWithActivity = 0;
+
+    // Calculate from days array
+    studyPlan.days.forEach(day => {
+      let dayHasActivity = false;
+      day.sessions.forEach(session => {
+        totalSessions++;
+        totalMinutes += session.duration;
+        if (session.completed) {
+          completedSessions++;
+          completedMinutes += session.duration;
+          dayHasActivity = true;
+        }
+      });
+      if (dayHasActivity) daysWithActivity++;
+    });
+
+    // Today's progress
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayData = studyPlan.days.find(d => d.date === todayStr);
+    const todayCompleted = todayData?.sessions.filter(s => s.completed).length || 0;
+    const todayTotal = todayData?.sessions.length || 0;
+    const todayProgress = todayTotal > 0 ? Math.round((todayCompleted / todayTotal) * 100) : 0;
+
+    return {
+      overallProgress: totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0,
+      totalSessions,
+      completedSessions,
+      totalHours: Math.round(totalMinutes / 60 * 10) / 10,
+      completedHours: Math.round(completedMinutes / 60 * 10) / 10,
+      daysWithActivity,
+      todayProgress,
+      todayCompleted,
+      todayTotal,
+      aceScore: calculateAceScore(studyPlan)
+    };
+  };
+
+  const updateStats = () => {
+    const newStats = calculateStats();
+    setStats(newStats);
+  };
 
   const fetchRecommendations = async () => {
     try {
@@ -138,7 +203,6 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
       if (response.success) {
         toast.success(`Planned! Deep Dive for ${rec.topic_id} added to tomorrow's schedule.`);
         setRecommendations(recommendations.filter(r => r.id !== rec.id));
-        // Refresh plan data to show the new session
         refreshStudyPlan();
       } else {
         toast.error(response.message || "Failed to apply recommendation");
@@ -151,13 +215,28 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
   };
 
   const loadNotifications = async () => {
+    if (!isAuthenticated) return;
+    console.log("[DEBUG] loadNotifications triggered");
     try {
       const response = await notificationAPI.getAll();
+      console.log("[DEBUG] Notifications response:", response);
       if (response.success) {
         setNotifications(response.data);
+      } else {
+        console.warn("[WARN] Failed to fetch notifications:", response.message);
+        if (response.status === 401) {
+           // useSession will handle the redirection if it's a persistent 401
+           console.log("Unauthorized, waiting for session handler...");
+        } else {
+           toast.error("Cloud sync: Could not load notifications.");
+        }
       }
-    } catch (error) {
-      console.error("Failed to load notifications");
+    } catch (error: any) {
+      console.error("[ERROR] Network error while loading notifications:", error);
+      // Only show toast for non-401 errors
+      if (error.status !== 401) {
+        toast.error("Network error: Notifications may be out of date.");
+      }
     }
   };
 
@@ -170,25 +249,29 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-
   const handleLogout = async () => {
     if (confirm('Are you sure you want to logout? All your data is safely saved.')) {
-      try {
-        // Clear all localStorage
-        localStorage.clear();
-
-        // Show success message
-        toast.success('Logged out successfully!');
-
-        // Redirect to landing
-        navigate("/");
-      } catch (error) {
-        console.error('Logout exception:', error);
-        toast.error('Error logging out. Please try again.');
-      }
+      onLogout();
     }
   };
+
+  // Update stats on component mount and when studyPlan changes
+  useEffect(() => {
+    updateStats();
+  }, [studyPlan, studyPlan?.days]);
+
+  useEffect(() => {
+    loadNotifications();
+    fetchRecommendations();
+  }, []);
+
+  useEffect(() => {
+    if (showNotifications) {
+      loadNotifications();
+    }
+  }, [showNotifications]);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   if (userType === 'parent') {
     return (
@@ -210,7 +293,14 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
     );
   }
 
+  useEffect(() => {
+    if (!userProfile) {
+      navigate('/profile');
+    }
+  }, [userProfile, navigate]);
+
   if (!userProfile || !studyPlan) {
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
         <div className="text-center space-y-4">
@@ -260,97 +350,10 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
   };
 
   // Calculate real-time statistics from actual data
-  const calculateStats = () => {
-    if (!studyPlan?.days || studyPlan.days.length === 0) {
-      return {
-        overallProgress: 0,
-        totalSessions: 0,
-        completedSessions: 0,
-        totalHours: 0,
-        completedHours: 0,
-        currentStreak: 0,
-        daysWithActivity: 0,
-        todayProgress: 0,
-        todayCompleted: 0,
-        todayTotal: 0
-      };
-    }
-
-    let totalSessions = 0;
-    let completedSessions = 0;
-    let totalMinutes = 0;
-    let completedMinutes = 0;
-    let daysWithActivity = 0;
-
-    // Calculate from days array
-    studyPlan.days.forEach(day => {
-      let dayHasActivity = false;
-      day.sessions.forEach(session => {
-        totalSessions++;
-        totalMinutes += session.duration;
-        if (session.completed) {
-          completedSessions++;
-          completedMinutes += session.duration;
-          dayHasActivity = true;
-        }
-      });
-      if (dayHasActivity) daysWithActivity++;
-    });
-
-    // Calculate streak (consecutive days with at least 1 completed session)
-    let streak = 0;
-    const sortedDays = [...studyPlan.days].sort((a, b) =>
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-
-    for (let i = 0; i < sortedDays.length; i++) {
-      const day = sortedDays[i];
-      const dayDate = new Date(day.date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (dayDate > today) continue;
-
-      if (day.sessions.some(s => s.completed)) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    // Today's progress
-    const today = new Date().toISOString().split('T')[0];
-    const todayData = studyPlan.days.find(d => d.date === today);
-    const todayCompleted = todayData?.sessions.filter(s => s.completed).length || 0;
-    const todayTotal = todayData?.sessions.length || 0;
-    const todayProgress = todayTotal > 0 ? Math.round((todayCompleted / todayTotal) * 100) : 0;
-
-    return {
-      overallProgress: totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0,
-      totalSessions,
-      completedSessions,
-      totalHours: Math.round(totalMinutes / 60 * 10) / 10,
-      completedHours: Math.round(completedMinutes / 60 * 10) / 10,
-      currentStreak: streak,
-      daysWithActivity,
-      todayProgress,
-      todayCompleted,
-      todayTotal
-    };
-  };
-
-  const updateStats = () => {
-    const newStats = calculateStats();
-    setStats(newStats);
-  };
-
-  // Update stats on component mount and when studyPlan changes
-  useEffect(() => {
-    updateStats();
-  }, [studyPlan, studyPlan?.days]);
 
   return (
-    <div className="min-h-screen bg-gray-50 relative overflow-hidden">
+    <div className="min-h-screen bg-[#F8FAFC] relative overflow-hidden">
+      <GlobalAnnouncement />
       {/* Decorative Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-100/30 rounded-full blur-3xl"></div>
@@ -584,34 +587,6 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
             </div>
           </div>
 
-          {/* Streak Card */}
-          <div className="group relative">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-400 via-pink-500 to-fuchsia-500 rounded-[24px] opacity-75 group-hover:opacity-100 blur transition duration-500 group-hover:duration-200"></div>
-            <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-600 p-7 shadow-2xl border-2 border-white/30 hover:scale-105 transition-all duration-500 h-full">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-700"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-4xl drop-shadow-2xl">🔥</div>
-                  <div className="text-right">
-                    <div className="text-5xl font-black text-white drop-shadow-2xl tracking-tight">
-                      {stats.currentStreak}
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-white/90 font-bold text-sm drop-shadow">Day Streak</div>
-                  <div className="text-white/80 font-semibold text-xs drop-shadow">
-                    Keep the momentum going! 💪
-                  </div>
-                  <div className="pt-2 flex items-center gap-2 text-white/95 font-bold text-xs">
-                    <Trophy className="w-4 h-4" />
-                    <span className="drop-shadow">Consistency is key</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Daily Goal Card */}
           <div className="group relative">
@@ -647,6 +622,41 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType }) => {
                   </div>
                   <div className="pt-1 text-white/80 font-semibold text-xs drop-shadow">
                     Sessions completed today
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Ace Score Card */}
+          <div className="group relative">
+            <div className="absolute -inset-0.5 rounded-[24px] opacity-75 group-hover:opacity-100 blur transition duration-500 group-hover:duration-200 bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500"></div>
+            <div className="relative overflow-hidden rounded-[22px] p-7 shadow-2xl border-2 border-white/30 hover:scale-105 transition-all duration-500 h-full bg-gradient-to-br from-pink-500 via-rose-500 to-pink-600">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-700"></div>
+              <div className="relative z-10 flex flex-col h-full justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <Star className={`w-8 h-8 text-white drop-shadow-2xl ${stats.aceScore >= 90 ? 'animate-pulse' : ''}`} />
+                  <div className="text-right">
+                    <div className="text-5xl font-black text-white drop-shadow-2xl tracking-tight">{stats.aceScore}</div>
+                  </div>
+                </div>
+                <div className="space-y-2 mt-auto">
+                  <div className="text-white/90 font-bold text-sm drop-shadow">Ace Score</div>
+                  <div className="text-white/80 font-semibold text-xs drop-shadow">
+                    Overall study health
+                  </div>
+                  <div className="pt-2">
+                    <div className="h-2 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm shadow-inner relative">
+                       <div 
+                         className="absolute inset-y-0 left-0 bg-white rounded-full transition-all duration-1000"
+                         style={{ width: `${stats.aceScore}%` }}
+                       />
+                    </div>
+                    <div className="flex justify-between text-white/70 text-[10px] uppercase font-bold tracking-widest mt-1.5">
+                       <span>Needs Work</span>
+                       <span>Excellent</span>
+                    </div>
                   </div>
                 </div>
               </div>

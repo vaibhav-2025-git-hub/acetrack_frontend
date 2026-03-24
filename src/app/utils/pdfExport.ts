@@ -84,7 +84,6 @@ export const exportToPDF = (profile: UserProfile, plan: StudyPlan) => {
 
   rightY = addInfo('Progress:', `${plan.overallProgress}%`, rightColX, rightY);
   rightY = addInfo('Sessions:', `${totalSessions}`, rightColX, rightY);
-  rightY = addInfo('Streak:', `${plan.currentStreak} days`, rightColX, rightY);
 
   rightY += 4;
   doc.setFont('helvetica', 'bold');

@@ -42,6 +42,7 @@ import {
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { authAPI, quizzesAPI, curriculumAPI, flashcardsAPI } from '../services/api';
+import { GlobalAnnouncement } from './GlobalAnnouncement';
 
 interface Quiz {
   id: string;
@@ -82,7 +83,11 @@ interface Flashcard {
   is_published?: boolean;
 }
 
-export const FacultyDashboard: React.FC = () => {
+interface FacultyDashboardProps {
+  onLogout: () => void;
+}
+
+export const FacultyDashboard: React.FC<FacultyDashboardProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('quizzes');
   const [quizzes, setQuizzes] = useState<Quiz[]>([]); // Initialize empty
@@ -95,7 +100,7 @@ export const FacultyDashboard: React.FC = () => {
   const [newQuizData, setNewQuizData] = useState({
     title: '',
     subject: '',
-    class: '11',
+    class: '12',
   });
 
   const [newQuestionData, setNewQuestionData] = useState({
@@ -416,14 +421,12 @@ export const FacultyDashboard: React.FC = () => {
   );
 
   const handleLogout = () => {
-    authAPI.logout();
-    toast.success('Logged out successfully');
-    navigate('/');
-    window.location.reload(); // Ensure state is cleared
+    onLogout();
   };
 
   return (
     <div className="relative min-h-screen bg-slate-50/50 p-6 overflow-hidden">
+      <GlobalAnnouncement />
       {/* Background Ambience */}
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none -z-10" />
       <div className="absolute bottom-1/4 left-0 w-[500px] h-[500px] bg-teal-500/5 blur-[100px] rounded-full pointer-events-none -z-10" />
@@ -637,7 +640,6 @@ export const FacultyDashboard: React.FC = () => {
                           onChange={(e) => setNewQuizData({ ...newQuizData, class: e.target.value })}
                           className="h-12 bg-white/80 border-white rounded-2xl font-bold shadow-sm px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                         >
-                          <option value="11">Class 11</option>
                           <option value="12">Class 12</option>
                         </select>
                       </div>

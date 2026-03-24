@@ -60,11 +60,13 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<
     }
 
     if (!response.ok) {
-      throw new Error(data.message || `Request failed with status ${response.status}`);
+      const error = new Error(data.message || `Request failed with status ${response.status}`) as any;
+      error.status = response.status;
+      throw error;
     }
 
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('API request error:', error);
     throw error;
   }

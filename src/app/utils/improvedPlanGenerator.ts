@@ -156,13 +156,18 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
   logPlanGeneration(`Total topics to distribute: ${distributedTopics.length}`);
 
   // Track current topic and remaining hours in that topic
-  const startDate = new Date(profile.startDate);
+  // Track current topic and remaining hours in that topic
+  const startDate = profile.startDate ? new Date(profile.startDate) : new Date();
+  if (isNaN(startDate.getTime())) {
+    logPlanGeneration('Invalid startDate, defaulting to today');
+  }
+  const validStartDate = isNaN(startDate.getTime()) ? new Date() : startDate;
   let currentTopicIndex = 0;
   let remainingHoursInCurrentTopic = 0;
   let lastStudyDayIndex = 0; // Track the actual last day we created
 
   for (let day = 0; day < studyDays; day++) {
-    const currentDate = new Date(startDate);
+    const currentDate = new Date(validStartDate);
     currentDate.setDate(currentDate.getDate() + day);
     const dateStr = currentDate.toISOString().split('T')[0];
 
@@ -251,7 +256,7 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
   logPlanGeneration(`Created ${Object.keys(dailyPlans).length} study days`);
 
   // Generate revision days
-  const lastStudyDay = new Date(startDate);
+  const lastStudyDay = new Date(validStartDate);
   lastStudyDay.setDate(lastStudyDay.getDate() + lastStudyDayIndex);
 
   for (let day = 0; day < revisionDays; day++) {
@@ -321,7 +326,6 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
       completedHours: 0,
       weakSubjects: [],
       strongSubjects: [],
-      streak: 0,
     });
   }
 
@@ -340,8 +344,6 @@ export const generateImprovedStudyPlan = (profile: UserProfile): StudyPlan => {
     days,
     weeklySummaries,
     overallProgress: 0,
-    currentStreak: 0,
-    longestStreak: 0,
     subjectTracking: {},
     parentAlerts: [],
   };

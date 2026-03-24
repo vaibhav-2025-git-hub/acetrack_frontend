@@ -31,7 +31,7 @@ Current Study Details:
 - Study Hours per Day: ${userProfile.studyHoursPerDay}h
 - Total Plan Duration: ${userProfile.totalDays} days
 - Overall Progress: ${studyPlan.overallProgress}%
-- Current Streak: ${studyPlan.currentStreak} days
+- Overall Progress: ${studyPlan.overallProgress}%
 
 Today's Schedule (${currentDate}):
 ${todaysSessions.map((s, idx) => `${idx + 1}. ${s.subjectName}: ${s.topicName} (${s.duration} min) - ${s.status}`).join('\n')}
@@ -125,9 +125,7 @@ const getMockResponse = (query: string, userProfile: UserProfile | null): string
   }
 
   // Motivation
-  if (lowerQuery.includes('motivat') || lowerQuery.includes('give up') || lowerQuery.includes("can't do")) {
-    return "You've got this! 🌟 Remember:\n\n1. **Progress isn't linear** - Some days are harder, and that's okay\n2. **Small steps add up** - Every study session matters\n3. **You're capable** - You wouldn't be here if you weren't committed\n\nYour current streak of " + (userProfile ? `${Math.random() > 0.5 ? '3' : '5'} days` : "learning") + " shows your dedication. Keep going!";
-  }
+    return "You've got this! 🌟 Remember:\n\n1. **Progress isn't linear** - Some days are harder, and that's okay\n2. **Small steps add up** - Every study session matters\n3. **You're capable** - You wouldn't be here if you weren't committed\n\nYour dedication shows your commitment. Keep going!";
 
   // Time management
   if (lowerQuery.includes('time') || lowerQuery.includes('schedule') || lowerQuery.includes('manage')) {

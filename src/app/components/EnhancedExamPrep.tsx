@@ -28,7 +28,8 @@ import {
   Upload,
   RefreshCw
 } from 'lucide-react';
-import { Exam, CrashCourse } from '../types';
+import type { Exam, CrashCourse, SyllabusTracker } from '../types';
+import type { Subject, Topic } from '../data/curriculum';
 import {
   generateCrashCourse,
   calculateSyllabusCoverage,

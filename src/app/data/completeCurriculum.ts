@@ -1,7 +1,7 @@
 // COMPLETE COMPREHENSIVE CURRICULUM - ALL BOARDS, CLASSES, STREAMS
 // This file contains ALL topics that will be distributed in the study plan
 
-import { Board } from './curriculum';
+import type { Board } from './curriculum';
 
 // Helper to create topics quickly
 const t = (names: string[], hours: number = 2) =>

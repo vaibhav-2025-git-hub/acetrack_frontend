@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useStudyPlan } from "../context/StudyPlanContext";
-import { 
+import type { 
   UserProfile, 
   LearningSpeed, 
   Difficulty, 
@@ -8,6 +8,7 @@ import {
 } from "../types";
 import { generateImprovedStudyPlan } from "../utils/improvedPlanGenerator";
 import { toISODate, mapBackendPlanToFrontend } from "../utils/helpers";
+import type { Flashcard } from '../types';
 import { toast } from "sonner";
 
 export type UserType = "student" | "parent" | "faculty" | "platform_admin";

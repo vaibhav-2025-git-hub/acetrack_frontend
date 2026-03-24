@@ -3,7 +3,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { useStudyPlan } from '../context/StudyPlanContext';
-import { StudyPlan } from '../types';
+import type { StudyPlan, StudySession } from '../types';
 import { ChevronLeft, ChevronRight, Check, X, Clock, Edit, Settings, ExternalLink, BookOpen, Video, FileText, PenTool, AlertTriangle, Shield, Keyboard, CheckCircle2 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Badge } from './ui/badge';
@@ -16,9 +16,10 @@ import { Tooltip } from './ui/tooltip';
 import { formatDate, isToday } from '../utils/helpers';
 
 // Session Timer Component
-const SessionTimer = ({ session, onComplete }: { session: any, onComplete: () => void }) => {
+const SessionTimer = ({ session, onComplete }: { session: StudySession, onComplete: () => void }) => {
   // Key for local storage to persist timer state locally
-  const storageKey = `timer_${session.id}`;
+  const storageId = session.id || 'temp';
+  const storageKey = `timer_${storageId}`;
 
   // Initialize from LocalStorage -> Backend -> Default
   const [timeLeft, setTimeLeft] = useState(() => {
@@ -269,7 +270,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
           status,
           completed: status === 'completed',
           completionPercentage: status === 'completed' ? 100 : status === 'in-progress' ? 50 : 0,
-          completedAt: status === 'completed' ? new Date().toISOString() : undefined,
+          ...(status === 'completed' ? { completedAt: new Date().toISOString() } : {}),
         }
         : s
     );
@@ -295,11 +296,12 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
           ? {
             date: day.date,
             sessions: updatedSessions.map(s => ({
-              ...s, // Spread all properties to satisfy StudySession type
-              completed: s.completed || s.status === 'completed'
+              ...s, 
+              completed: s.completed || s.status === 'completed',
+              ...(s.status === 'completed' ? { completedAt: s.completedAt || new Date().toISOString() } : {})
             }))
           }
-          : { ...day, sessions: [...day.sessions] } // Create new references for unchanged days too
+          : { ...day, sessions: [...day.sessions] } 
       )
     };
 
@@ -371,6 +373,7 @@ export const DailyView: React.FC<DailyViewProps> = ({ currentDate, setCurrentDat
   };
 
   const handleChangeSubject = (sessionId: string, newSubjectId: string) => {
+    if (!dailyPlan) return;
     const session = dailyPlan.sessions.find(s => s.id === sessionId);
     const oldSubjectName = session?.subjectName || 'Unknown';
 

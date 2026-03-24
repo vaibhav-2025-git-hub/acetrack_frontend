@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useStudyPlan } from '../context/StudyPlanContext';
 import { RotateCw, ChevronLeft, ChevronRight, Plus, BookOpen, Sparkles, Target, Settings } from 'lucide-react';
-import { Flashcard } from '../types';
+import type { Flashcard } from '../types';
 import {
   getFlashcardsDueToday,
   getFlashcardsBySubject,

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { useStudyPlan } from '../context/StudyPlanContext';
-import { Mood } from '../types';
+import type { Mood } from '../types';
 import { Smile, Meh, Frown, TrendingUp } from 'lucide-react';
 
 const moodOptions: { value: Mood; label: string; emoji: string; color: string }[] = [

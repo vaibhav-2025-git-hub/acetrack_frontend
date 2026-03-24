@@ -44,7 +44,7 @@ import {
 import { notificationAPI, studyPlanAPI } from '../services/api';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
-import { StudySession } from '../types';
+import type { StudySession } from '../types';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -353,7 +353,6 @@ export const StudyDashboard: React.FC<StudyDashboardProps> = ({ userType, onLogo
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] relative overflow-hidden">
-      <GlobalAnnouncement />
       {/* Decorative Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-100/30 rounded-full blur-3xl"></div>

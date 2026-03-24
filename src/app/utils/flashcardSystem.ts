@@ -1,4 +1,4 @@
-import { Flashcard } from '../types';
+import type { Flashcard } from '../types';
 
 // Spaced Repetition Algorithm (SM-2)
 export const calculateNextReviewDate = (

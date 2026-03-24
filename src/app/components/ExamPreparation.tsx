@@ -8,7 +8,7 @@ import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useStudyPlan } from '../context/StudyPlanContext';
 import { Calendar, Target, BookOpen, TrendingUp, AlertCircle, CheckCircle2, Clock, Zap, Plus, X, Edit2, Trash2, FileText, Brain, Award } from 'lucide-react';
-import { Exam, CrashCourse } from '../types';
+import type { Exam, CrashCourse, UserProfile, LearningSpeed } from '../types';
 import {
   generateCrashCourse,
   calculateSyllabusCoverage,

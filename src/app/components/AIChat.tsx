@@ -5,7 +5,9 @@ import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { Bot, Send, ExternalLink, Loader2 } from 'lucide-react';
 import { useStudyPlan } from '../context/StudyPlanContext';
-import { sendMessageToAI, ChatMessage } from '../utils/aiChatbot';
+import { sendMessageToAI } from '../utils/aiChatbot';
+import type { AIChatMessage } from '../utils/aiChatbot';
+import type { ChatMessage } from '../types';
 
 interface Message {
   id: string;
@@ -39,12 +41,12 @@ export const AIChat: React.FC = () => {
     setInput('');
     setIsLoading(true);
 
-    // Convert messages to ChatMessage format
-    const chatHistory: ChatMessage[] = messages.slice(-5).map(m => ({
-      role: m.isBot ? 'assistant' : 'user',
+    // Convert messages to AIChatMessage format
+    const chatHistory: AIChatMessage[] = messages.slice(-5).map(m => ({
+      role: m.isBot ? 'assistant' as const : 'user' as const,
       content: m.text
     }));
-    chatHistory.push({ role: 'user', content: input });
+    chatHistory.push({ role: 'user' as const, content: input });
 
     try {
       // Get current date

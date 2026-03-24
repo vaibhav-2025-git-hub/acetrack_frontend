@@ -1,5 +1,5 @@
 // Complete comprehensive curriculum for all subjects - Class 12
-import { Subject } from './curriculum';
+import type { Subject } from './curriculum';
 
 // Helper function to create topics
 const createTopics = (names: string[], baseHours: number = 2): Array<{id: string; name: string; estimatedHours: number}> => {

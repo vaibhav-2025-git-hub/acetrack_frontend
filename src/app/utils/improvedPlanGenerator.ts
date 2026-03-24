@@ -1,5 +1,6 @@
-import { UserProfile, StudyPlan, DailyPlan, StudySession, WeeklySummary } from '../types';
-import { curriculumData, Subject, Topic } from '../data/curriculum';
+import type { UserProfile, StudyPlan, DailyPlan, StudySession, WeeklySummary, MoodEntry, Mood } from '../types';
+import type { Subject, Topic } from '../data/curriculum';
+import { curriculumData } from '../data/curriculum';
 
 // Logging for debugging
 const logPlanGeneration = (message: string, data?: any) => {

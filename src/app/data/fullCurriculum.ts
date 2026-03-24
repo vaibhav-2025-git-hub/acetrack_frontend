@@ -1,5 +1,5 @@
 // Complete comprehensive curriculum for all boards and streams
-import { Board } from './curriculum';
+import type { Board } from './curriculum';
 
 // This file contains the full curriculum with all topics for proper distribution
 

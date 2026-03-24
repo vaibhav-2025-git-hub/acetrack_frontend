@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Button } from './ui/button';
 import { curriculumData } from '../data/curriculum';
-import { UserProfile } from '../types';
+import type { UserProfile } from '../types';
 import { CheckCircle2, Circle, Settings, Sparkles } from 'lucide-react';
 
 interface ProfileSetupProps {

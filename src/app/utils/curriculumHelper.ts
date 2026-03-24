@@ -1,5 +1,5 @@
 // Helper to generate comprehensive curriculum topics
-import { Subject, Chapter, Topic } from '../data/curriculum';
+import type { Subject, Chapter, Topic } from '../data/curriculum';
 
 // Generate topics with unique IDs
 const genTopics = (names: string[], hours: number = 2): Topic[] => {

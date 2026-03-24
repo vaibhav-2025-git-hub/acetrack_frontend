@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { UserProfile, StudyPlan, DailyPlan, ProgressData } from '../types';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import type { UserProfile, StudyPlan, DailyPlan, ProgressData } from '../types';
 import { toast } from 'sonner';
 import { mapBackendPlanToFrontend } from '../utils/helpers';
 

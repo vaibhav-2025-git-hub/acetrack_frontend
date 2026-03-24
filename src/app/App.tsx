@@ -1,8 +1,21 @@
 import React from "react";
+import type {
+  StudyPlan,
+  DailyPlan,
+  ProgressData,
+  SubjectTracking,
+  ParentAlert,
+  MoodEntry,
+  UserProfile,
+  LearningSpeed,
+  Difficulty,
+  PsychometricDetails
+} from "./types";
 import {
   Routes,
   Route,
   Navigate,
+  useLocation,
   useNavigate
 } from "react-router-dom";
 import {
@@ -21,7 +34,9 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { curriculumData } from "./data/curriculum";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
-import { useSession, UserType } from "./hooks/useSession";
+import { useSession } from "./hooks/useSession";
+import type { UserType } from "./hooks/useSession";
+import { GlobalAnnouncement } from "./components/GlobalAnnouncement";
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
   constructor(props: any) {
@@ -97,6 +112,7 @@ const AppRoutes: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 relative overflow-hidden">
+      <GlobalAnnouncement />
       <div
         className="absolute inset-0 opacity-[0.06] pointer-events-none"
         style={{

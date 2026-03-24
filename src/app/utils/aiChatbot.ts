@@ -1,4 +1,4 @@
-import { UserProfile, StudyPlan } from '../types';
+import type { UserProfile, StudyPlan } from '../types';
 
 // OpenAI API configuration
 // To use this, you need to sign up at https://platform.openai.com/
@@ -6,7 +6,7 @@ import { UserProfile, StudyPlan } from '../types';
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || 'YOUR_API_KEY_HERE';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
-export interface ChatMessage {
+export interface AIChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
@@ -51,7 +51,7 @@ Keep responses concise (2-3 short paragraphs max). Use a friendly,supportive ton
 
 // Call OpenAI API
 export const sendMessageToAI = async (
-  messages: ChatMessage[],
+  messages: AIChatMessage[],
   userProfile: UserProfile | null,
   studyPlan: StudyPlan | null,
   currentDate: string

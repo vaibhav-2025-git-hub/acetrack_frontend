@@ -1,5 +1,5 @@
 // CBSE Class 12 Science Streams Only - PCMB, PCM(CS), PCB(CS)
-import { Stream } from './curriculum';
+import type { Stream } from './curriculum';
 
 // Helper to create topics quickly
 const t = (names: string[], hours: number = 2) =>

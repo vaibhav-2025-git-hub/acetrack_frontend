@@ -1,4 +1,4 @@
-import { QuizQuestion, QuizAttempt } from '../types';
+import type { QuizQuestion, QuizAttempt } from '../types';
 
 // Generate quiz questions for a topic (AI-powered mock)
 export const generateQuizForTopic = (

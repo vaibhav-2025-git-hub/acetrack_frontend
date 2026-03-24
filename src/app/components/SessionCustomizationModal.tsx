@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, GripVertical, Pencil, Trash2 } from 'lucide-react';
-import { StudySession } from '../types';
+import type { StudySession } from '../types';
 
 interface SessionCustomizationModalProps {
   isOpen: boolean;

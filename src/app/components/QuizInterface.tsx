@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { useStudyPlan } from '../context/StudyPlanContext';
 import { Brain, Clock, CheckCircle2, XCircle, Award, TrendingUp, Play } from 'lucide-react';
-import { QuizQuestion, QuizAttempt } from '../types';
+import type { QuizQuestion, QuizAttempt } from '../types';
 import { generateQuizForTopic, calculateQuizScore, analyzeQuizPerformance } from '../utils/quizGenerator';
 import { curriculumData } from '../data/curriculum';
 import { quizzesAPI } from '../services/api';

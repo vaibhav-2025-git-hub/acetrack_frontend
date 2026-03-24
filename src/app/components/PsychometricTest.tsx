@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Brain, Clock, Eye, Headphones, Users, Target, Zap, BookOpen, Lightbulb, CheckCircle2, Calculator, MessageSquare, Grid3x3, Puzzle, Sparkles } from 'lucide-react';
-import { LearningSpeed, PsychometricDetails } from '../types';
+import type { LearningSpeed, PsychometricDetails } from '../types';
 
 interface PsychometricTestProps {
   onComplete: (learningSpeed: LearningSpeed, learningStyle: string, details: PsychometricDetails) => void;

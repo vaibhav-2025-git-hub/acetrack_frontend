@@ -1,4 +1,11 @@
-import { GamificationProfile, Badge, Achievement, Challenge, StudyPlan, StudySession } from '../types';
+import type { 
+  GamificationProfile, 
+  Badge, 
+  Achievement, 
+  Challenge, 
+  StudyPlan, 
+  StudySession 
+} from '../types';
 
 // XP Rewards
 const XP_REWARDS = {

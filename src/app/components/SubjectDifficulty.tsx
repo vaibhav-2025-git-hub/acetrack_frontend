@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Difficulty } from '../types';
-import { Subject } from '../data/curriculum';
+import type { Difficulty } from '../types';
+import type { Subject } from '../data/curriculum';
 import { Sparkles, Brain } from 'lucide-react';
 
 interface SubjectDifficultyProps {

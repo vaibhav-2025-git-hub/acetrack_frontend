@@ -5,40 +5,28 @@ import { adminAPI } from '../services/api';
 export const GlobalAnnouncement: React.FC = () => {
     const [announcement, setAnnouncement] = useState<any>(null);
     const [isVisible, setIsVisible] = useState(false);
-    const [debugMsg, setDebugMsg] = useState<string>('');
 
     useEffect(() => {
-        setIsVisible(true);
-        setDebugMsg('INFO: Component Mounted, Fetching Data...');
-
         const fetchLatestAnnouncement = async () => {
             try {
-                setDebugMsg('INFO: API Call Sent...');
                 const res = await adminAPI.getAnnouncements();
                 
-                if (res.success && res.data) {
-                    if (res.data.length > 0) {
-                        const latestAnn = res.data[0];
-                        const dismissedId = localStorage.getItem('last_dismissed_announcement');
-                        if (dismissedId !== latestAnn.id.toString()) {
-                            setAnnouncement(latestAnn);
-                            setIsVisible(true);
-                            setDebugMsg('');
-                        } else {
-                            setDebugMsg(`INFO: Hidden (Dismissed ID: ${latestAnn.id})`);
-                        }
-                    } else {
-                        setDebugMsg('INFO: Success (Empty Data)');
+                if (res.success && res.data && res.data.length > 0) {
+                    const latestAnn = res.data[0];
+                    const dismissedId = localStorage.getItem('last_dismissed_announcement');
+                    
+                    if (dismissedId !== latestAnn.id.toString()) {
+                        setAnnouncement(latestAnn);
                         setIsVisible(true);
+                    } else {
+                        setIsVisible(false);
                     }
                 } else {
-                    setDebugMsg(`INFO: API Returned Success: ${res.success}, Data: ${res.data ? 'Present' : 'Missing'}`);
-                    setIsVisible(true);
+                    setIsVisible(false);
                 }
             } catch (error: any) {
                 console.error('Failed to fetch announcements:', error);
-                setDebugMsg(`FETCH ERROR: ${error.message}`);
-                setIsVisible(true); // Show the banner with error info
+                setIsVisible(false); 
             }
         };
 
@@ -56,7 +44,7 @@ export const GlobalAnnouncement: React.FC = () => {
         }
     };
 
-    if (!isVisible || (!announcement && !debugMsg)) return null;
+    if (!isVisible || !announcement) return null;
 
     return (
         <div className="relative isolate flex items-center gap-x-6 overflow-hidden bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-6 py-2.5 sm:px-3.5 sm:before:flex-1 animate-in slide-in-from-top duration-500">
@@ -78,7 +66,7 @@ export const GlobalAnnouncement: React.FC = () => {
                     <svg viewBox="0 0 2 2" className="mx-2 inline h-0.5 w-0.5 fill-current" aria-hidden="true">
                         <circle cx="1" cy="1" r="1" />
                     </svg>
-                    {debugMsg ? <span className="text-yellow-300 font-mono">{debugMsg}</span> : announcement.message}
+                    {announcement.message}
                 </p>
                 <div className="flex flex-1 justify-end">
                     <button 

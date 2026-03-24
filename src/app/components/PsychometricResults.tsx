@@ -22,7 +22,7 @@ import {
     Sparkles
 } from 'lucide-react';
 import { useStudyPlan } from '../context/StudyPlanContext';
-import { UserProfile, LearningSpeed } from '../types';
+import type { UserProfile, LearningSpeed } from '../types';
 
 interface PsychometricResultsProps {
     profile?: UserProfile | null;

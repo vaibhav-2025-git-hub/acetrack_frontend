@@ -5,7 +5,12 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { useStudyPlan } from '../context/StudyPlanContext';
 import { Trophy, Star, Zap, Award, TrendingUp, Target, Crown, Flame, Shield } from 'lucide-react';
-import { GamificationProfile, Challenge, Achievement as AchievementType } from '../types';
+import type { 
+  GamificationProfile, 
+  Challenge, 
+  Achievement, 
+  Badge as BadgeType 
+} from '../types';
 
 export const GamificationDashboard: React.FC = () => {
   const { studyPlan } = useStudyPlan();
@@ -256,7 +261,7 @@ const ChallengeCard: React.FC<{
   );
 };
 
-const AchievementCard: React.FC<{ achievement: AchievementType }> = ({ achievement }) => {
+const AchievementCard: React.FC<{ achievement: Achievement }> = ({ achievement }) => {
   return (
     <div
       className={`p-4 rounded-lg border-2 ${

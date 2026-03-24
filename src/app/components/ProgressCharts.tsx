@@ -14,8 +14,9 @@ export const ProgressCharts: React.FC = () => {
   const weeklyData = (() => {
     const weeks: Record<number, { completed: number; planned: number }> = {};
     
-    (studyPlan.days || []).forEach((day) => {
-      const weekNumber = Math.floor(((studyPlan.days || []).indexOf(day)) / 7) + 1;
+    const days = studyPlan.days || [];
+    days.forEach((day, index) => {
+      const weekNumber = Math.floor(index / 7) + 1;
       if (!weeks[weekNumber]) {
         weeks[weekNumber] = { completed: 0, planned: 0 };
       }
@@ -39,7 +40,8 @@ export const ProgressCharts: React.FC = () => {
   const subjectProgress = (() => {
     const subjects: Record<string, number> = {};
     
-    (studyPlan.days || []).forEach(day => {
+    const days = studyPlan.days || [];
+    days.forEach(day => {
       day.sessions.forEach(session => {
         if (session.completed) {
           subjects[session.subjectId] = (subjects[session.subjectId] || 0) + 1;

@@ -1,4 +1,4 @@
-import { StudyPlan, MoodEntry, Mood, UserProfile } from '../types';
+import type { StudyPlan, MoodEntry, Mood, UserProfile } from '../types';
 import { curriculumData } from '../data/curriculum';
 
 const logMood = (message: string, data?: any) => {

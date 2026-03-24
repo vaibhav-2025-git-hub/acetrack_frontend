@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { UserProfile, StudyPlan } from '../types';
+import type { UserProfile, StudyPlan, DailyPlan, StudySession, WeeklySummary } from '../types';
 
 export const exportToPDF = (profile: UserProfile, plan: StudyPlan) => {
   const doc = new jsPDF();

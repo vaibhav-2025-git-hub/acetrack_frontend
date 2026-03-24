@@ -1,4 +1,4 @@
-import { StudySession, DailyPlan } from '../types';
+import type { StudySession, DailyPlan, ProgressData } from '../types';
 import { calculateAceScore } from '../utils/helpers';
 import React from 'react';
 import { useStudyPlan } from '../context/StudyPlanContext';

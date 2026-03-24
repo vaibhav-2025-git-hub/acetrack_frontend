@@ -1,4 +1,17 @@
-import { Exam, CrashCourse, SyllabusTracker, DailyPlan, StudySession, MockTest, UserProfile } from '../types';
+import type { 
+  Exam, 
+  CrashCourse, 
+  SyllabusTracker, 
+  DailyPlan, 
+  StudySession, 
+  MockTest, 
+  UserProfile,
+  GamificationProfile, 
+  Badge, 
+  Achievement, 
+  Challenge, 
+  StudyPlan 
+} from '../types';
 import { curriculumData } from '../data/curriculum';
 
 // Generate crash course for upcoming exam

@@ -1,4 +1,4 @@
-import { ReferenceLink } from '../types';
+import type { ReferenceLink } from '../types';
 
 // Comprehensive reference links for all major topics
 export const referenceLinksDatabase: Record<string, ReferenceLink[]> = {
@@ -127,7 +127,7 @@ export const getReferenceLinks = (topicId: string, subjectId: string): Reference
   );
 
   if (partialMatch) {
-    return referenceLinksDatabase[partialMatch];
+    return referenceLinksDatabase[partialMatch] || referenceLinksDatabase['default'];
   }
 
   // Generate subject-specific default links
@@ -155,5 +155,6 @@ export const getReferenceLinks = (topicId: string, subjectId: string): Reference
   };
 
   const subjectKey = subjectId.toLowerCase();
-  return subjectLinks[subjectKey] || referenceLinksDatabase['default'];
+  const links = subjectLinks[subjectKey];
+  return links || referenceLinksDatabase['default'] || [];
 };

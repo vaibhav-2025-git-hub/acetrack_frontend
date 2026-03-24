@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
-import { LearningSpeed } from '../types';
+import type { UserProfile, LearningSpeed } from '../types';
 import { Progress } from './ui/progress';
 
 interface OnboardingTestProps {

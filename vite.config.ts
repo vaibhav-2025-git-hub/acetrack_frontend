@@ -16,4 +16,22 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          icons: ['lucide-react'],
+          ui: [
+            './src/app/components/ui/card',
+            './src/app/components/ui/button',
+            './src/app/components/ui/tabs',
+            './src/app/components/ui/progress'
+          ],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
 })

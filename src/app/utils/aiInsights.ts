@@ -1,4 +1,4 @@
-import { AIInsight, SmartRecommendation, LearningPattern, StudyPlan, StudySession } from '../types';
+import type { AIInsight, SmartRecommendation, LearningPattern, StudyPlan, StudySession } from '../types';
 
 // Generate AI insights based on study patterns
 export const generateAIInsights = (
